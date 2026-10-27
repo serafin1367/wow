@@ -4,6 +4,7 @@ const ROBOT_SCRIPT = preload("res://scripts/robot_model.gd")
 const LANDER_SCRIPT = preload("res://scripts/colony_lander.gd")
 const CHARGER_SCRIPT = preload("res://scripts/charging_pad.gd")
 const FACTORY_SCRIPT = preload("res://scripts/factory_models.gd")
+const KENNEY_ASSETS = preload("res://scripts/kenney_assets.gd")
 
 
 func _ready() -> void:
@@ -49,18 +50,31 @@ func _ready() -> void:
 		add_child(robot)
 		_label(variants[i].to_upper(), robot.position + Vector3(0, 2.9, 0))
 
-	var names: Array[String] = ["extractor", "conveyor", "smelter"]
-	for i in range(3):
-		var factory = FACTORY_SCRIPT.new()
-		factory.machine_type = names[i]
-		factory.position = Vector3(float(i) * 8.0 - 7.0, 0, 7.0)
+	# Podglad rzeczywistych plikow Kenney Factory Kit v3.0 (CC0).
+	var factory_names: Array[String] = ["machine", "conveyor-long", "machine-window", "robot-arm-a", "hopper-square"]
+	for i in range(factory_names.size()):
+		var factory = KENNEY_ASSETS.model("factory", factory_names[i], 2.0 if i < 3 else 1.6)
+		if factory == null:
+			factory = FACTORY_SCRIPT.new()
+			factory.machine_type = "conveyor" if i == 1 else "extractor"
+		factory.position = Vector3(float(i) * 6.2 - 13.0, 0.0, 8.0)
 		add_child(factory)
-		_label(names[i].to_upper(), factory.position + Vector3(0, 6.3, 0))
+		_label(factory_names[i].to_upper(), factory.position + Vector3(0, 4.5, 0))
+
+	# Osobna galeria przyrody: dziala nawet bez glownej mapy.
+	var nature_names: Array[String] = ["tree-oak", "tree-default", "tree-cone", "rock-largea", "rock-largeb"]
+	for i in range(nature_names.size()):
+		var scale: float = 3.8 if i < 3 else 3.0
+		var nature = KENNEY_ASSETS.model("nature", nature_names[i], scale)
+		if nature != null:
+			nature.position = Vector3(float(i) * 5.2 - 12.0, 0.0, 18.0)
+			add_child(nature)
+			_label(nature_names[i].to_upper(), nature.position + Vector3(0, 5.4, 0))
 
 	var camera := Camera3D.new()
 	camera.current = true
-	camera.position = Vector3(-2, 33, 50)
-	camera.look_at(Vector3(-4, 5, -2), Vector3.UP)
+	camera.position = Vector3(-4, 37, 60)
+	camera.look_at(Vector3(-4, 4, 4), Vector3.UP)
 	camera.fov = 65.0
 	add_child(camera)
 
