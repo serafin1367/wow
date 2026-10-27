@@ -37,6 +37,7 @@ func _ready() -> void:
 	status_label.font_size = 40
 	status_label.pixel_size = 0.008
 	status_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	status_label.visible = false # Wskazania przeniesione do panelu HUD.
 	add_child(status_label)
 	_refresh_label()
 
