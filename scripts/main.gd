@@ -6,6 +6,11 @@ const CAMERA_SCRIPT = preload("res://scripts/rts_camera.gd")
 const NAVIGATION_SCRIPT = preload("res://scripts/navigation_grid.gd")
 const SELECTION_BOX_SCRIPT = preload("res://scripts/selection_box.gd")
 const RESOURCE_SCRIPT = preload("res://scripts/resource_node.gd")
+const TOWN_HALL_SCRIPT = preload("res://scripts/town_hall.gd")
+const TOWN_HALL_COST: Dictionary = {"wood": 40, "stone": 20}
+const WORKER_COST: Dictionary = {"wood": 10, "gold": 20}
+const TOWN_HALL_RADIUS: float = 4.5
+const MAX_WORKERS: int = 30
 const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
 
@@ -18,6 +23,13 @@ var is_dragging: bool = false
 var drag_start: Vector2 = Vector2.ZERO
 var resource_totals: Dictionary = {"wood": 0, "gold": 0, "stone": 0}
 var resource_label: Label
+var status_label: Label
+var build_button: Button
+var train_button: Button
+var build_mode: bool = false
+var town_hall: StaticBody3D
+var training_timer: Timer
+var training_in_progress: bool = false
 
 
 func _ready() -> void:
@@ -28,6 +40,7 @@ func _ready() -> void:
 	_create_workers()
 	_create_camera()
 	_create_hud()
+	_create_training_timer()
 
 
 func _create_environment() -> void:
@@ -101,6 +114,7 @@ func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
 	tree.name = "Tree"
 	tree.position = Vector3(coords.x, 0.0, coords.y)
 	parent_node.add_child(tree)
+	tree.add_to_group("resource_nodes")
 
 	var trunk := MeshInstance3D.new()
 	trunk.name = "Trunk"
@@ -152,6 +166,7 @@ func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 	deposit.name = deposit_name
 	deposit.position = location
 	add_child(deposit)
+	deposit.add_to_group("resource_nodes")
 
 	for i in range(4):
 		var rock := MeshInstance3D.new()
@@ -222,12 +237,16 @@ func _create_workers() -> void:
 		Vector3(3.0, 0.0, 0.0)
 	]
 	for start in starting_positions:
-		var worker = WORKER_SCRIPT.new()
-		worker.name = "Worker%d" % (workers.size() + 1)
-		worker.position = start
-		add_child(worker)
-		worker.resource_delivered.connect(_on_resource_delivered)
-		workers.append(worker)
+		_spawn_worker(start)
+
+
+func _spawn_worker(at_position: Vector3) -> void:
+	var worker = WORKER_SCRIPT.new()
+	worker.name = "Worker%d" % (workers.size() + 1)
+	worker.position = at_position
+	add_child(worker)
+	worker.resource_delivered.connect(_on_resource_delivered)
+	workers.append(worker)
 
 
 func _create_camera() -> void:
@@ -263,6 +282,34 @@ func _create_hud() -> void:
 	ui.add_child(resource_label)
 	_update_resource_hud()
 
+	var actions := HBoxContainer.new()
+	actions.name = "EconomyActions"
+	actions.position = Vector2(16, 82)
+	actions.add_theme_constant_override("separation", 10)
+	ui.add_child(actions)
+
+	build_button = Button.new()
+	build_button.text = "Ratusz (B): 40 drewna + 20 kamienia"
+	build_button.pressed.connect(_toggle_build_mode)
+	actions.add_child(build_button)
+
+	train_button = Button.new()
+	train_button.text = "Robotnik (T): 10 drewna + 20 zlota"
+	train_button.pressed.connect(_train_worker)
+	actions.add_child(train_button)
+
+	status_label = Label.new()
+	status_label.name = "GameplayStatus"
+	status_label.position = Vector2(16, 124)
+	status_label.add_theme_font_size_override("font_size", 17)
+	status_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.77))
+	status_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	status_label.add_theme_constant_override("shadow_offset_x", 2)
+	status_label.add_theme_constant_override("shadow_offset_y", 2)
+	ui.add_child(status_label)
+	_set_status("Zbieraj surowce, potem postaw ratusz klawiszem B.")
+	_update_action_buttons()
+
 	selection_box = SELECTION_BOX_SCRIPT.new()
 	selection_box.name = "SelectionBox"
 	selection_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -271,6 +318,18 @@ func _create_hud() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_B:
+			_toggle_build_mode()
+			return
+		if event.keycode == KEY_T:
+			_train_worker()
+			return
+		if event.keycode == KEY_ESCAPE and build_mode:
+			build_mode = false
+			_set_status("Anulowano budowe ratusza.")
+			return
+
 	if event is InputEventMouseMotion and mouse_down:
 		var distance := drag_start.distance_to(event.position)
 		if distance >= 8.0:
@@ -283,6 +342,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
+		if build_mode:
+			if event.pressed:
+				_try_place_town_hall(event.position)
+			return
 		if event.pressed:
 			mouse_down = true
 			is_dragging = false
@@ -297,7 +360,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_dragging = false
 
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		_command_move_selected(event.position)
+		if build_mode:
+			build_mode = false
+			_set_status("Anulowano budowe ratusza.")
+		else:
+			_command_move_selected(event.position)
 
 
 func _select_by_click(screen_position: Vector2, additive: bool) -> void:
@@ -306,6 +373,11 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 		_clear_selection()
 	if hit.has("collider") and hit["collider"] in workers:
 		_select_worker(hit["collider"])
+		return
+
+	var building_hit := _raycast(screen_position, 8)
+	if building_hit.has("collider") and building_hit["collider"] == town_hall:
+		_set_status("Ratusz: nacisnij T lub przycisk Robotnik, aby rozpoczac szkolenie.")
 
 
 func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
@@ -370,6 +442,127 @@ func _select_worker(worker: CharacterBody3D) -> void:
 		return
 	selected_workers.append(worker)
 	worker.set_selected(true)
+
+
+func _create_training_timer() -> void:
+	training_timer = Timer.new()
+	training_timer.name = "WorkerTraining"
+	training_timer.one_shot = true
+	training_timer.wait_time = 4.0
+	training_timer.timeout.connect(_finish_training)
+	add_child(training_timer)
+
+
+func _toggle_build_mode() -> void:
+	if town_hall != null:
+		_set_status("Ratusz juz istnieje. Mozesz produkowac robotnikow.")
+		return
+	if build_mode:
+		build_mode = false
+		_set_status("Anulowano budowe.")
+		return
+	if not _can_afford(TOWN_HALL_COST):
+		_set_status("Brakuje surowcow: ratusz wymaga 40 drewna i 20 kamienia.")
+		return
+	build_mode = true
+	_set_status("Wybierz LPM wolne miejsce na ratusz; PPM lub Esc anuluje.")
+
+
+func _try_place_town_hall(screen_position: Vector2) -> void:
+	var hit := _raycast(screen_position, 1)
+	if hit.is_empty():
+		_set_status("Wskaz teren na mapie, aby zbudowac ratusz.")
+		return
+	var point: Vector3 = hit["position"]
+	var site := Vector3(roundf(point.x), 0.0, roundf(point.z))
+	if not _is_build_site_clear(site):
+		_set_status("Brak miejsca: odsun ratusz od jednostek, magazynu i zloz.")
+		return
+	if not _spend_resources(TOWN_HALL_COST):
+		build_mode = false
+		_set_status("Nie masz juz wystarczajacych surowcow.")
+		return
+
+	town_hall = TOWN_HALL_SCRIPT.new()
+	town_hall.position = site
+	add_child(town_hall)
+	navigation.block_circle(Vector2(site.x, site.z), TOWN_HALL_RADIUS)
+	build_mode = false
+	_set_status("Ratusz zbudowany! Mozesz szkolic nowych robotnikow (T).")
+	_update_action_buttons()
+
+
+func _is_build_site_clear(site: Vector3) -> bool:
+	if absf(site.x) > 42.0 or absf(site.z) > 42.0:
+		return false
+	if _ground_distance(site, DEPOT_POSITION) < TOWN_HALL_RADIUS + 4.0:
+		return false
+	for source in get_tree().get_nodes_in_group("resource_nodes"):
+		if source.remaining > 0 and _ground_distance(site, source.global_position) < TOWN_HALL_RADIUS + source.clearance_radius + 0.5:
+			return false
+	for worker in workers:
+		if _ground_distance(site, worker.global_position) < TOWN_HALL_RADIUS + 0.5:
+			return false
+	return true
+
+
+func _ground_distance(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
+
+
+func _train_worker() -> void:
+	if town_hall == null:
+		_set_status("Najpierw zbuduj ratusz (B).")
+		return
+	if training_in_progress:
+		_set_status("Trwa szkolenie robotnika, zaczekaj chwile.")
+		return
+	if workers.size() >= MAX_WORKERS:
+		_set_status("Osiagnieto limit %d robotnikow." % MAX_WORKERS)
+		return
+	if not _spend_resources(WORKER_COST):
+		_set_status("Brakuje surowcow: robotnik kosztuje 10 drewna i 20 zlota.")
+		return
+	training_in_progress = true
+	training_timer.start()
+	_set_status("Trwa szkolenie robotnika (4 sekundy).")
+	_update_action_buttons()
+
+
+func _finish_training() -> void:
+	training_in_progress = false
+	var spawn_position: Vector3 = navigation.find_free_spawn_near(town_hall.global_position, workers.size())
+	_spawn_worker(spawn_position)
+	_set_status("Nowy robotnik jest gotowy! Liczba robotnikow: %d." % workers.size())
+	_update_action_buttons()
+
+
+func _can_afford(cost: Dictionary) -> bool:
+	for resource_type in cost.keys():
+		if int(resource_totals.get(resource_type, 0)) < int(cost[resource_type]):
+			return false
+	return true
+
+
+func _spend_resources(cost: Dictionary) -> bool:
+	if not _can_afford(cost):
+		return false
+	for resource_type in cost.keys():
+		resource_totals[resource_type] = int(resource_totals[resource_type]) - int(cost[resource_type])
+	_update_resource_hud()
+	return true
+
+
+func _set_status(message: String) -> void:
+	if status_label != null:
+		status_label.text = message
+
+
+func _update_action_buttons() -> void:
+	if build_button != null:
+		build_button.disabled = town_hall != null
+	if train_button != null:
+		train_button.disabled = training_in_progress or workers.size() >= MAX_WORKERS
 
 
 func _on_resource_delivered(resource_type: String, amount: int) -> void:
