@@ -173,7 +173,7 @@ func _add_tree(parent_node: Node3D, coords: Vector2, sapling: bool = false) -> S
 	return tree
 
 
-func _finish_sapling_growth(sapling: StaticBody3D) -> void:
+func _finish_sapling_growth(sapling) -> void:
 	if not is_instance_valid(sapling) or not sapling.is_sapling:
 		return
 	# Nie wstawiaj nowej kolizji na stojacej tam jednostce.
@@ -577,7 +577,7 @@ func _is_build_site_clear(site: Vector3) -> bool:
 	if _ground_distance(site, DEPOT_POSITION) < TOWN_HALL_RADIUS + 4.0:
 		return false
 	for source in get_tree().get_nodes_in_group("resource_nodes"):
-		if source.remaining > 0 and _ground_distance(site, source.global_position) < TOWN_HALL_RADIUS + source.clearance_radius + 0.5:
+		if (source.remaining > 0 or source.is_sapling) and _ground_distance(site, source.global_position) < TOWN_HALL_RADIUS + source.clearance_radius + 0.5:
 			return false
 	for worker in workers:
 		if _ground_distance(site, worker.global_position) < TOWN_HALL_RADIUS + 0.5:
@@ -655,7 +655,7 @@ func _is_forester_site_clear(site: Vector3) -> bool:
 	return true
 
 
-func _on_forester_plant_request(hut: StaticBody3D) -> void:
+func _on_forester_plant_request(hut) -> void:
 	if not is_instance_valid(hut):
 		return
 	var occupied_trees: int = 0
@@ -675,7 +675,7 @@ func _on_forester_plant_request(hut: StaticBody3D) -> void:
 			roundf(hut.global_position.z + sin(angle) * distance)
 		)
 		if _is_tree_planting_site_clear(planting_site, hut):
-			var forest: Node3D = get_node("Forest")
+			var forest: Node3D = get_node("Forest") as Node3D
 			_add_tree(forest, planting_site, true)
 			return
 
