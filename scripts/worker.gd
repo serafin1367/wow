@@ -17,6 +17,7 @@ var selection_ring: MeshInstance3D
 
 var state: WorkState = WorkState.IDLE
 var resource_target = null
+var preferred_resource_type: String = ""
 var navigation_grid = null
 var depot_position: Vector3 = Vector3.ZERO
 var harvest_elapsed: float = 0.0
@@ -97,6 +98,7 @@ func _physics_process(delta: float) -> void:
 func command_move(new_path: Array[Vector3]) -> void:
 	# Rozkaz przemieszczania przerywa biezace zbieranie.
 	resource_target = null
+	preferred_resource_type = ""
 	waypoints = new_path
 	next_waypoint = 0
 	state = WorkState.MOVING if not new_path.is_empty() else WorkState.IDLE
@@ -106,6 +108,7 @@ func command_gather(target: Node3D, grid: RefCounted, drop_point: Vector3) -> vo
 	if not is_instance_valid(target) or not target.has_method("harvest"):
 		return
 	resource_target = target
+	preferred_resource_type = target.resource_type
 	navigation_grid = grid
 	depot_position = drop_point
 
@@ -118,20 +121,45 @@ func command_gather(target: Node3D, grid: RefCounted, drop_point: Vector3) -> vo
 
 func _go_to_resource() -> void:
 	if not _resource_available():
+		resource_target = _find_alternative_resource()
+	if not _resource_available():
 		if carried_amount > 0:
 			_go_to_depot()
 		else:
 			state = WorkState.IDLE
 		return
-	var target_position: Vector3 = resource_target.global_position
-	_start_route(target_position, WorkState.TO_RESOURCE)
+	_start_route(resource_target.global_position, WorkState.TO_RESOURCE)
 
 
 func _go_to_depot() -> void:
 	if carried_amount <= 0:
 		state = WorkState.IDLE
 		return
-	_start_route(depot_position, WorkState.TO_DEPOT)
+	if navigation_grid == null:
+		state = WorkState.IDLE
+		return
+	var route: Array[Vector3] = navigation_grid.find_access_path(global_position, depot_position, 3.5)
+	if route.is_empty():
+		state = WorkState.IDLE
+		push_warning("Nie mozna znalezc punktu dostawy przy magazynie.")
+		return
+	waypoints = route
+	next_waypoint = 0
+	state = WorkState.TO_DEPOT
+
+
+func _find_alternative_resource() -> Node3D:
+	# Po zniknieciu scietego drzewa robotnik automatycznie szuka nastepnego.
+	var nearest: Node3D = null
+	var nearest_distance: float = INF
+	for source in get_tree().get_nodes_in_group("resource_nodes"):
+		if source.resource_type != preferred_resource_type or source.remaining <= 0:
+			continue
+		var distance: float = global_position.distance_squared_to(source.global_position)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest = source
+	return nearest
 
 
 func _start_route(target: Vector3, next_state: int) -> void:
@@ -152,16 +180,14 @@ func _finish_route() -> void:
 		if _resource_available():
 			harvest_elapsed = 0.0
 			state = WorkState.GATHERING
-		elif carried_amount > 0:
-			_go_to_depot()
 		else:
-			state = WorkState.IDLE
+			_go_to_resource()
 	elif state == WorkState.TO_DEPOT:
 		if carried_amount > 0:
 			resource_delivered.emit(carried_type, carried_amount)
 			carried_amount = 0
 			carried_type = ""
-		if _resource_available():
+		if preferred_resource_type != "":
 			_go_to_resource()
 		else:
 			state = WorkState.IDLE
@@ -174,7 +200,7 @@ func _process_harvest(delta: float) -> void:
 		if carried_amount > 0:
 			_go_to_depot()
 		else:
-			state = WorkState.IDLE
+			_go_to_resource()
 		return
 
 	harvest_elapsed += delta
