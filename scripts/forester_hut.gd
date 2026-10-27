@@ -1,6 +1,5 @@
 extends StaticBody3D
-## Lesniczowka okresowo zglasza potrzebe posadzenia drzewa.
-## Miejsce nasadzenia i dojrzewanie kontroluje glowna scena.
+## Modul rekultywacji: sadzi drzewa, funkcjonalnie zastępuje lesniczowke.
 
 signal plant_requested(hut: StaticBody3D)
 
@@ -14,57 +13,34 @@ var planting_timer: Timer
 
 
 func _ready() -> void:
-	name = "ForesterHut"
+	name = "BioRegenerator"
 	collision_layer = 4 | 8
 	collision_mask = 0
+	var hull := _material(Color(0.14, 0.22, 0.27))
+	var shell := _material(Color(0.53, 0.66, 0.64))
+	var green := _material(Color(0.30, 0.98, 0.55), true)
+	var orange := _material(Color(0.96, 0.53, 0.19))
 
-	var foundation := MeshInstance3D.new()
-	foundation.name = "Foundation"
-	var base_mesh := BoxMesh.new()
-	base_mesh.size = Vector3(4.0, 0.35, 4.0)
-	foundation.mesh = base_mesh
-	foundation.position.y = 0.18
-	foundation.material_override = _material(Color(0.36, 0.33, 0.25))
-	add_child(foundation)
+	_add_box("Foundation", Vector3(0, 0.23, 0), Vector3(4.4, 0.46, 4.3), hull)
+	_add_box("Core", Vector3(0, 1.53, 0), Vector3(3.2, 2.45, 3.1), shell)
+	_add_box("Roof", Vector3(0, 2.92, 0), Vector3(3.8, 0.4, 3.55), hull)
+	_add_box("Entrance", Vector3(0, 1.14, 1.65), Vector3(1.1, 1.85, 0.12), hull)
+	_add_box("GreenhouseWindow", Vector3(0, 2.16, 1.74), Vector3(2.5, 0.45, 0.1), green)
 
-	var hut := MeshInstance3D.new()
-	hut.name = "Hut"
-	var hut_mesh := BoxMesh.new()
-	hut_mesh.size = Vector3(3.3, 2.6, 3.3)
-	hut.mesh = hut_mesh
-	hut.position.y = 1.6
-	hut.material_override = _material(Color(0.56, 0.38, 0.23))
-	add_child(hut)
+	for side in [-1.0, 1.0]:
+		_add_box("Support", Vector3(side * 1.88, 1.37, 0), Vector3(0.25, 2.1, 3.35), hull)
+		_add_box("Ventilation", Vector3(side * 1.15, 3.28, 0), Vector3(0.8, 0.38, 0.72), orange)
+	_add_cylinder("SeedVessel", Vector3(0, 3.76, -0.72), 0.65, 1.1, green)
 
-	var roof := MeshInstance3D.new()
-	roof.name = "Roof"
-	var roof_mesh := BoxMesh.new()
-	roof_mesh.size = Vector3(4.2, 0.55, 4.2)
-	roof.mesh = roof_mesh
-	roof.position.y = 3.1
-	roof.material_override = _material(Color(0.16, 0.37, 0.20))
-	add_child(roof)
-
-	var doorway := MeshInstance3D.new()
-	doorway.name = "Door"
-	var door_mesh := BoxMesh.new()
-	door_mesh.size = Vector3(0.9, 1.9, 0.12)
-	doorway.mesh = door_mesh
-	doorway.position = Vector3(0.0, 1.1, 1.72)
-	doorway.material_override = _material(Color(0.25, 0.17, 0.10))
-	add_child(doorway)
-
-	var title := Label3D.new()
-	title.name = "Title"
-	title.text = "LESNICZOWKA"
-	title.position.y = 4.2
-	title.font_size = 38
-	title.pixel_size = 0.009
-	title.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	add_child(title)
+	var label := Label3D.new()
+	label.text = "MODUL REKULTYWACJI"
+	label.position.y = 5.05
+	label.font_size = 36
+	label.pixel_size = 0.009
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(label)
 
 	var collision := CollisionShape3D.new()
-	collision.name = "BuildingCollision"
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(3.8, 3.2, 3.8)
 	collision.shape = shape
@@ -85,8 +61,35 @@ func _on_planting_timer() -> void:
 	plant_requested.emit(self)
 
 
-func _material(tint: Color) -> StandardMaterial3D:
+func _add_box(node_name: String, at: Vector3, size: Vector3, mat: Material) -> void:
+	var item := MeshInstance3D.new()
+	item.name = node_name
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	item.mesh = mesh
+	item.position = at
+	item.material_override = mat
+	add_child(item)
+
+
+func _add_cylinder(node_name: String, at: Vector3, radius: float, height: float, mat: Material) -> void:
+	var item := MeshInstance3D.new()
+	item.name = node_name
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = height
+	item.mesh = mesh
+	item.position = at
+	item.material_override = mat
+	add_child(item)
+
+
+func _material(tint: Color, glowing: bool = false) -> StandardMaterial3D:
 	var result := StandardMaterial3D.new()
 	result.albedo_color = tint
-	result.roughness = 0.95
+	result.metallic = 0.34
+	result.roughness = 0.52
+	if glowing:
+		result.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return result
