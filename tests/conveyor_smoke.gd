@@ -92,7 +92,7 @@ func _run_test() -> void:
 		return
 
 	# Zanik zasilania nie moze skasowac ladunku juz na tasmie.
-	game.landing_rocket.health = 5.0
+	game.landing_rocket.health = 1.0
 	game._update_factory_power()
 	if ore_link.powered or metal_link.powered:
 		_fail("Tasmy pracuja przy wylaczonej sieci")
