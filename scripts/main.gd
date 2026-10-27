@@ -5,6 +5,8 @@ const WORKER_SCRIPT = preload("res://scripts/worker.gd")
 const CAMERA_SCRIPT = preload("res://scripts/rts_camera.gd")
 const NAVIGATION_SCRIPT = preload("res://scripts/navigation_grid.gd")
 const SELECTION_BOX_SCRIPT = preload("res://scripts/selection_box.gd")
+const RESOURCE_SCRIPT = preload("res://scripts/resource_node.gd")
+const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
 
 var workers: Array = []
@@ -14,12 +16,15 @@ var selection_box: Control
 var mouse_down: bool = false
 var is_dragging: bool = false
 var drag_start: Vector2 = Vector2.ZERO
+var resource_totals: Dictionary = {"wood": 0, "gold": 0, "stone": 0}
+var resource_label: Label
 
 
 func _ready() -> void:
 	_create_environment()
 	_create_ground()
 	_create_resources()
+	_create_depot()
 	_create_workers()
 	_create_camera()
 	_create_hud()
@@ -86,7 +91,11 @@ func _create_resources() -> void:
 
 
 func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
-	var tree := StaticBody3D.new()
+	var tree = RESOURCE_SCRIPT.new()
+	tree.resource_type = "wood"
+	tree.remaining = 60
+	tree.clearance_radius = 1.6
+	tree.depleted.connect(_on_resource_depleted)
 	tree.collision_layer = 4
 	tree.collision_mask = 0
 	tree.name = "Tree"
@@ -121,11 +130,23 @@ func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
 	trunk_collision.shape = trunk_shape
 	trunk_collision.position.y = 1.25
 	tree.add_child(trunk_collision)
+
+	# Klikniecie korony drzewa rowniez zleca scinanie.
+	var crown_collision := CollisionShape3D.new()
+	var crown_shape := SphereShape3D.new()
+	crown_shape.radius = 1.7
+	crown_collision.shape = crown_shape
+	crown_collision.position.y = 3.35
+	tree.add_child(crown_collision)
 	navigation.block_circle(coords, 1.6)
 
 
 func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
-	var deposit := StaticBody3D.new()
+	var deposit = RESOURCE_SCRIPT.new()
+	deposit.resource_type = "gold" if deposit_name == "GoldMine" else "stone"
+	deposit.remaining = 300
+	deposit.clearance_radius = 3.6
+	deposit.depleted.connect(_on_resource_depleted)
 	deposit.collision_layer = 4
 	deposit.collision_mask = 0
 	deposit.name = deposit_name
@@ -155,6 +176,45 @@ func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 	navigation.block_circle(Vector2(location.x, location.z), 3.6)
 
 
+func _create_depot() -> void:
+	var depot := Node3D.new()
+	depot.name = "Stockpile"
+	depot.position = DEPOT_POSITION
+	add_child(depot)
+
+	var platform := MeshInstance3D.new()
+	platform.name = "StoragePlatform"
+	var platform_mesh := BoxMesh.new()
+	platform_mesh.size = Vector3(4.0, 0.35, 4.0)
+	platform.mesh = platform_mesh
+	platform.position.y = 0.18
+	platform.material_override = _make_material(Color(0.43, 0.34, 0.20))
+	depot.add_child(platform)
+
+	for i in range(3):
+		var crate := MeshInstance3D.new()
+		crate.name = "Crate%d" % i
+		var crate_mesh := BoxMesh.new()
+		crate_mesh.size = Vector3(0.95, 1.0 + float(i) * 0.25, 0.95)
+		crate.mesh = crate_mesh
+		crate.position = Vector3(float(i) - 1.0, 0.85, 0.0)
+		crate.material_override = _make_material(Color(0.52, 0.33, 0.17))
+		depot.add_child(crate)
+
+	var depot_name := Label3D.new()
+	depot_name.text = "MAGAZYN"
+	depot_name.position.y = 2.6
+	depot_name.font_size = 40
+	depot_name.pixel_size = 0.008
+	depot_name.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	depot.add_child(depot_name)
+
+
+func _on_resource_depleted(resource, clearance_radius: float) -> void:
+	var p: Vector3 = resource.global_position
+	navigation.unblock_circle(Vector2(p.x, p.z), clearance_radius)
+
+
 func _create_workers() -> void:
 	var starting_positions: Array[Vector3] = [
 		Vector3(-3.0, 0.0, 0.0),
@@ -166,6 +226,7 @@ func _create_workers() -> void:
 		worker.name = "Worker%d" % (workers.size() + 1)
 		worker.position = start
 		add_child(worker)
+		worker.resource_delivered.connect(_on_resource_delivered)
 		workers.append(worker)
 
 
@@ -182,7 +243,7 @@ func _create_hud() -> void:
 	add_child(ui)
 	var hint := Label.new()
 	hint.name = "Controls"
-	hint.text = "WOW | LPM: wybierz | Przeciagnij LPM: grupa | Shift: dodaj | PPM: ruch | WASD: kamera | Rolka: zoom"
+	hint.text = "WOW | LPM: wybierz | Przeciagnij LPM: grupa | PPM na surowcu: zbieraj | PPM na ziemi: idz | WASD: kamera"
 	hint.position = Vector2(16, 14)
 	hint.add_theme_font_size_override("font_size", 16)
 	hint.add_theme_color_override("font_color", Color.WHITE)
@@ -190,6 +251,17 @@ func _create_hud() -> void:
 	hint.add_theme_constant_override("shadow_offset_x", 2)
 	hint.add_theme_constant_override("shadow_offset_y", 2)
 	ui.add_child(hint)
+
+	resource_label = Label.new()
+	resource_label.name = "ResourceCounters"
+	resource_label.position = Vector2(16, 43)
+	resource_label.add_theme_font_size_override("font_size", 22)
+	resource_label.add_theme_color_override("font_color", Color(1.0, 0.96, 0.80))
+	resource_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	resource_label.add_theme_constant_override("shadow_offset_x", 2)
+	resource_label.add_theme_constant_override("shadow_offset_y", 2)
+	ui.add_child(resource_label)
+	_update_resource_hud()
 
 	selection_box = SELECTION_BOX_SCRIPT.new()
 	selection_box.name = "SelectionBox"
@@ -254,6 +326,15 @@ func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
 func _command_move_selected(screen_position: Vector2) -> void:
 	if selected_workers.is_empty():
 		return
+
+	var resource_hit := _raycast(screen_position, 4)
+	if resource_hit.has("collider"):
+		var clicked_object = resource_hit["collider"]
+		if clicked_object.has_method("harvest"):
+			for worker in selected_workers:
+				worker.command_gather(clicked_object, navigation, DEPOT_POSITION)
+			return
+
 	var hit := _raycast(screen_position, 1)
 	if hit.is_empty():
 		return
@@ -289,6 +370,23 @@ func _select_worker(worker: CharacterBody3D) -> void:
 		return
 	selected_workers.append(worker)
 	worker.set_selected(true)
+
+
+func _on_resource_delivered(resource_type: String, amount: int) -> void:
+	if not resource_totals.has(resource_type):
+		return
+	resource_totals[resource_type] = int(resource_totals[resource_type]) + amount
+	_update_resource_hud()
+
+
+func _update_resource_hud() -> void:
+	if resource_label == null:
+		return
+	resource_label.text = "Drewno: %d     Zloto: %d     Kamien: %d" % [
+		int(resource_totals["wood"]),
+		int(resource_totals["gold"]),
+		int(resource_totals["stone"])
+	]
 
 
 func _make_material(tint: Color) -> StandardMaterial3D:
