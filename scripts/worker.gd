@@ -26,7 +26,7 @@ var resource_target = null
 var repair_target = null
 var preferred_resource_type: String = ""
 var navigation_grid = null
-var charging_station: Node3D
+var charging_station = null
 var depot_position: Vector3 = Vector3.ZERO
 var energy: float = BATTERY_MAX
 var harvest_elapsed: float = 0.0
