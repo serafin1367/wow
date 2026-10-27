@@ -43,6 +43,8 @@ lub cudzych modeli:
 - `scripts/robot_model.gd` — trzy rozne sylwetki robotow.
 - `scripts/factory_models.gd` — **wiertnica, tasmociag i huta**; na razie tylko modele.
 - `scripts/asset_showroom.gd` — scena wystawowa wszystkich modeli.
+- `scripts/town_hall.gd` — futurystyczne centrum dowodzenia (dawny ratusz).
+- `scripts/forester_hut.gd` — technologiczny modul rekultywacji (dawna lesniczowka).
 - `scenes/asset_showroom.tscn` — otworz ja w Godocie i nacisnij **F6**, aby zobaczyc modele.
 
 **Wazne:** uruchomienie `asset_showroom.tscn` pokazuje modele wizualne. Wiertnica,
@@ -85,9 +87,9 @@ i sprawdzenia w edytorze Godot na komputerze gracza.
 | Wydobycie | PPM na drzewie / kopalni (gornik lub transportowy) |
 | Naprawa | PPM na rakiecie / ladowarce (robot naprawczy) |
 | Reczne ladowanie | C |
-| Budowa ratusza | B, potem LPM na wolnym terenie |
+| Budowa centrum dowodzenia | B, potem LPM na wolnym terenie |
 | Szkolenie kolejnego gornika | T |
-| Budowa lesniczowki | L, potem LPM na wolnym terenie |
+| Budowa modulu rekultywacji | L, potem LPM na wolnym terenie |
 | Anulowanie budowy | Esc / PPM |
 | Kamera | WASD, krawedz ekranu, kolko myszy |
 
