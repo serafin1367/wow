@@ -1,0 +1,12 @@
+# Godot 4
+.godot/
+*.translation
+.export/
+export.cfg
+
+# Edytory i system
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
