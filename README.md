@@ -4,6 +4,47 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.7 — pierwsze dzialajace tasmociagi
+
+Po zbudowaniu pierwszej fabryki mozna teraz stopniowo zastapic roboty
+transportowe **automatycznymi tasmociagami**. Tasmy sa widoczne na mapie,
+prowadzone po trasach A* omijajacych drzewa i budynki. Surowce przesuwaja
+sie po nich jako osobne paczki 3D (nie sa tylko zmianami licznika).
+
+**Instrukcja pierwszego uruchomienia:**
+
+1. Zaktualizuj projekt: `git pull origin main`, uruchom F5.
+2. Zbuduj kopalnie **M** na zlozu zelaza i hute **H** w poblizu.
+3. Pozwol turkusowemu robotowi przewiezc rudy i pierwsze sztabki metalu.
+4. Gdy w magazynie bedzie **5 sztabek**, nacisnij **J** (lub przycisk
+   `J TASMA RUDY`). Gra automatycznie poprowadzi tasme kopalnia -> huta.
+   Robot od tej chwili odbiera metal z huty do magazynu.
+5. Gdy uzbierasz dalsze **8 sztabek**, nacisnij **N** (lub przycisk
+   `N TASMA METALU`). Gra poprowadzi huta -> magazyn. Cala linia
+   kopalnia -> huta -> magazyn moze wowczas dzialac bez transportowca.
+6. Nadal mozesz zaznaczyc transportowca i wyznaczyc mu zadanie PPM.
+
+| Tasmociag | Koszt | Pobor mocy | Przepustowosc |
+|---|---:|---:|---:|
+| Ruda (kopalnia -> huta) | 5 metalu | 0,15 kW | 2 rudy na 0,8 s |
+| Metal (huta -> magazyn) | 8 metalu | 0,15 kW | 2 sztabki na 0,8 s |
+
+Paczki przemieszczaja sie z predkoscia **7 jednostek mapy/s**. Produkcja
+kopalni i huty zachowuje dotychczasowe tempo. Bufory zrodel sa ograniczone,
+wiec wypelniona huta zatrzymuje rozladunek bez utraty materialu.
+Przy braku mocy paczki zostaja na tasmie i ruszaja po przywroceniu energii.
+
+Kod: `scripts/conveyor_link.gd`, `scripts/navigation_grid.gd` i integracja
+`scripts/main.gd`, `scripts/worker.gd`. Test automatyczny
+`tests/conveyor_smoke.gd` sprawdza prowadzenie tasmy, przeplyw rud i metalu,
+**bilans masy surowcow**, koszty i odciecie zasilania.
+
+**Ograniczenia prototypu:** obecnie sa dwa automatyczne polaczenia
+miedzy konkretnymi budynkami (maks. 95 segmentow), bez recznego
+rysowania pojedynczych fragmentow, rozdzielaczy i sortownikow.
+Tasmy sa dekoracjami bez kolizji dla robotow. To etap przed
+wprowadzeniem pelnej sieci logistycznej typu Factorio.
+
 ## WOW 0.6 — pierwsza fabryka (wydobycie, transport, przetop)
 
 Zaimplementowano dzialajacy system kopalnia zelaza -> robot transportowy -> huta
