@@ -4,6 +4,56 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.5 — trzy planety i nowa oprawa srodowiska
+
+Prototyp moze przedstawic kilka odmiennych swiatow bez przepisywania mechaniki
+budowania. **Start: Mars** — ceglasta powierzchnia, pyl, grafitowe skaly,
+surowe rosliny terraformacyjne i blado-pomaranczowe oswietlenie.
+
+| Planeta | Klimat wizualny | Kolorystyka i szczegoly |
+|---|---|---|
+| Mars | Pustynna kolonia / eksperymentalna terraformacja | Rdzawe i ciemne skaly, czerwony pyl, turkusowe uprawy |
+| Ziemia | Strefa testowa kolonii | Zielony grunt, zielone drzewa, klasyczne kamienie, jasne niebo |
+| Kepler | Obca planeta science fiction (fikcyjna) | Niebiesko-fioletowy grunt, turkusowe krysztaly, fioletowa roslinnosc |
+
+**Klawisz `P` lub przycisk PLANETA na gornym pasku** zmienia wariant w czasie
+gry, bez resetowania jednostek i gospodarki. To funkcja do testowania stylistyki:
+**nie jest jeszcze podroza rakieta na inna planete**. Docelowo kazda planeta
+bedzie miala wlasna mape, rudy, technologia i ograniczenia ekologiczne.
+
+### Ulepszenia wygladu
+
+- Proceduralny shader powierzchni zamiast identycznego koloru i ogromnych
+  plaskich plam; warstwy piasku, mineralow i subtelnych pekniec.
+- Kenney Nature Kit: pozostaja modele drzew i kamieni (CC0), ale pojawiaja sie
+  planetarne barwy roslinnosci, drobne odlamki skalne i charakterystyczne
+  krysztaly. Dekoracje **nie blokuja ruchu robotow**.
+- Zloto: ciemne rudy z metalicznymi pomaranczowo-zlotymi zylami i krysztalami,
+  zamiast jednolicie zoltych skal.
+- Kamien: ciemniejsze mineralne formacje i chlodne zlacza.
+- Magazyn: autorski industrialny budynek `scripts/depot_model.gd`, platforma
+  rozladunkowa, oswietlenie, Kenney Factory Kit skrzynie, bez zmiany kolizji
+  magazynu oraz przyjmowania dostaw.
+- **Wazne:** siatka nawigacji pozostaje plaska i niezmieniona. Shader i
+  dekoracje nie implementuja jeszcze gorskiego terenu ani modelu klimatu.
+
+Kod planety: `scripts/planet_environment.gd`; nowy magazyn:
+`scripts/depot_model.gd`. Test nienaruszalnosci gospodarki:
+`tests/planet_smoke.gd` (uruchamiany przez GitHub Actions).
+
+### Test po aktualizacji
+
+```bash
+git pull origin main
+```
+
+Otworz Godot 4.x, poczekaj na import, uruchom F5.
+Zobacz Marsa, wybierz robota i wyslij go po zloto. W trakcie transportu
+nacisnij P i przelacz planete kolejno na Ziemie i Keplera.
+Sprawdz, czy zloze, ladunek i energia robota zachowuja wartosci.
+Oceń kontrast drzew, zlota i magazynu w kazdym biomie.
+Tryb z planeta jest na razie demonstracja wizualna.
+
 ## WOW 0.2 — pierwszy dzien na planecie
 
 Na mapie stoi **rakieta kolonizacyjna** z panelami slonecznymi. Gdy uruchamiasz gre,
