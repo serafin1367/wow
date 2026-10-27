@@ -6,7 +6,7 @@ const MAX_HEALTH: float = 100.0
 const CHARGE_RATE: float = 23.0
 const REQUIRED_POWER: float = 4.0
 
-var power_source: Node3D
+var power_source = null
 var health: float = 85.0
 var status_label: Label3D
 
