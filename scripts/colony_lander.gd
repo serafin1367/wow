@@ -69,6 +69,10 @@ func solar_output() -> float:
 	return NOMINAL_SOLAR_POWER * health / MAX_HEALTH
 
 
+func get_access_radius() -> float:
+	return CLEARANCE_RADIUS
+
+
 func repair(amount: float) -> float:
 	var restored: float = minf(maxf(amount, 0.0), MAX_HEALTH - health)
 	health += restored
