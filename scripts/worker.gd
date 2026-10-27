@@ -261,7 +261,7 @@ func _go_to_repair() -> void:
 	if navigation_grid == null:
 		state = WorkState.IDLE
 		return
-	var radius: float = repair_target.CLEARANCE_RADIUS + 0.55
+	var radius: float = repair_target.get_access_radius() + 0.55
 	var route: Array[Vector3] = navigation_grid.find_access_path(global_position, repair_target.global_position, radius)
 	if route.is_empty():
 		state = WorkState.IDLE
