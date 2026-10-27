@@ -7,11 +7,11 @@ Autorski RTS 3D na **Godot 4.x / GDScript**, docelowo dla Windows. Grafika jest 
 - Mapa 3D 100 × 100 z kamerą RTS (WASD, krawędzie ekranu, kółko myszy).
 - Zaznaczanie pojedynczych i wielu jednostek; rozkazy ruchu i zbierania.
 - Pathfinding `AStarGrid2D`: robotnicy omijają drzewa, kopalnie i ratusz.
-- **Drewno, złoto i kamień** — ograniczone złoża, które znikają po wyczerpaniu.
-- Automatyczne zbieranie surowców: robotnik ładuje maksymalnie 10 jednostek i oddaje je do magazynu.
+- **Drewno, złoto i kamień** — złoża są ograniczone. W prototypie każde drzew ma **200 drewna**, kopalnia **3000 złota**, a kamieniołom **2000 kamienia**. Po wyczerpaniu złoże znika; robotnik szuka następnego źródła tego samego surowca (jeśli jest dostępne).
+- Automatyczne zbieranie surowców: robotnik ładuje maksymalnie 10 jednostek i dostarcza je **do punktu obok magazynu**, nie przechodzi przez magazyn.
 - Liczniki surowców i populacji robotników.
 - **Ratusz:** stawianie po zebraniu **40 drewna i 20 kamienia**.
-- **Produkcja robotnika:** koszt **10 drewna i 20 złota**, czas szkolenia **4 sekundy**, limit populacji **30**.
+- **Produkcja robotnika:** koszt **10 drewna i 20 złota**, czas szkolenia **4 sekundy**, limit populacji **30**. Robotnicy pojawiają się na wolnych polach po stronie ratusza bliższej kamerze, bez nakładania się na inne jednostki; nowy robotnik dostaje na chwilę napis nad głową.
 - Na razie można zbudować **jeden** ratusz; budowa odbywa się natychmiast po wskazaniu miejsca.
 
 ## Instalacja / aktualizacja
@@ -55,6 +55,16 @@ Otwórz `project.godot` w Godot 4 i naciśnij **F5**.
 6. Sprawdź, czy nowy robotnik może poruszać się i zbierać surowce tak jak pozostałe jednostki.
 7. Spróbuj postawić ratusz na kopalni, zbyt blisko magazynu albo bez surowców — mechanizm powinien odrzucić taki rozkaz.
 
+## Test ręczny poprawek widoczności i kolizji
+
+1. Po zebraniu wymaganych surowców postaw ratusz i wyszkol kilka jednostek. Sprawdź, czy pojawiają się **przed ratuszem względem aktualnego ustawienia kamery** oraz czy nowe postacie nie stoją jedna na drugiej.
+2. Zleć trzem robotnikom wydobywanie różnych surowców. Po zebraniu 10 jednostek powinni podejść do **obrzeża magazynu**, a nie przenikać przez skrzynie.
+3. Wyślij jednostki PPM na środek ratusza i magazynu. Powinny dojść do najbliższego osiągalnego pola **obok** budynku.
+4. Pozwól robotnikowi wyczerpać drzewo. Drzewo powinno zniknąć, a robotnik — jeśli ma inne drzewa na mapie — wybrać kolejne źródło drewna.
+5. Sprawdź licznik surowców, także gdy kilku robotników jednocześnie oddaje ładunek.
+
+**Uwaga:** To zestaw poprawek po testach gracza; nie był uruchamiany w Godocie w środowisku automatycznym. Prosimy o zgłaszanie błędów z zakładki Debugger.
+
 ## Struktura skryptów
 
 - `scripts/main.gd` — mapa, sterowanie, surowce, budowanie, szkolenie, HUD.
@@ -69,7 +79,7 @@ Otwórz `project.godot` w Godot 4 i naciśnij **F5**.
 
 - Nowe mechaniki budowania i szkolenia czekają na **test działania w edytorze Godot**.
 - Budowa ratusza jest natychmiastowa: bez animacji pracujących budowniczych i bez czasu budowy.
-- Jednostki jeszcze nie unikają siebie nawzajem. Nowe jednostki korzystają z wolnego pola blisko ratusza.
+- Jednostki jeszcze nie unikają siebie nawzajem w trakcie ruchu. Pozycja startowa jednostek jest wybierana z uwzględnieniem zajętych miejsc i kamery.
 - Brak zapisu gry, walki, animacji oraz automatycznego wybierania kolejnych złóż.
 - Ruch przerywa wykonywanie rozkazu zbierania. Niesiony surowiec zostaje u robotnika, dopóki nie wróci do oddawania materiałów.
 - Nie ma jeszcze przeciwników ani frakcji.
