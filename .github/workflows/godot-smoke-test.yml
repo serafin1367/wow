@@ -19,7 +19,31 @@ jobs:
           include-templates: false
       - name: Import and parse project resources
         run: godot --headless --path . --editor --quit
-      - name: Run main scene for 120 frames
-        run: godot --headless --path . --quit-after 120
-      - name: Validate assets showroom
-        run: godot --headless --path . --quit-after 10 res://scenes/asset_showroom.tscn
+      - name: Run main scene for 360 frames and assert no GDScript errors
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --quit-after 360 2>&1 | tee /tmp/wow-main.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|Invalid access to property|Invalid call\.' /tmp/wow-main.log; then
+            echo "Godot runtime errors detected in main scene."
+            exit 1
+          fi
+      - name: Validate assets showroom and assert no GDScript errors
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --quit-after 30 res://scenes/asset_showroom.tscn 2>&1 | tee /tmp/wow-showroom.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|Invalid access to property|Invalid call\.' /tmp/wow-showroom.log; then
+            echo "Godot runtime errors detected in asset showroom."
+            exit 1
+          fi
+      - name: Test planet cycling preserves gameplay state
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/planet_smoke.gd 2>&1 | tee /tmp/wow-planets.log
+          grep -F 'PLANET SMOKE OK' /tmp/wow-planets.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:' /tmp/wow-planets.log; then
+            echo "GDScript errors detected in planet smoke test."
+            exit 1
+          fi
