@@ -9,6 +9,8 @@ skrypty pobierajace brakujace dane przy uruchamianiu.
   4 kamienie, trawa i stos klod.
 - `factory/` — 9 obiektow z **Kenney Factory Kit 3.0**: tasma prosta,
   narożnik, rozgalezienie T, maszyny, pudla, lej zsypowy i ramie robota.
+- `factory/Textures/colormap.png` — wspolna tekstura barw Factory Kit, wymagana
+  przez importowane GLB; bez niej maszyny moglyby utracic kolory.
 
 ## Autorzy i licencje
 
