@@ -72,11 +72,11 @@ func _ready() -> void:
 			_label(nature_names[i].to_upper(), nature.position + Vector3(0, 5.4, 0))
 
 	var camera := Camera3D.new()
-	camera.current = true
 	camera.position = Vector3(-4, 37, 60)
-	camera.look_at(Vector3(-4, 4, 4), Vector3.UP)
 	camera.fov = 65.0
 	add_child(camera)
+	camera.look_at(Vector3(-4, 4, 4), Vector3.UP)
+	camera.current = true
 
 
 func _label(title: String, location: Vector3) -> void:
