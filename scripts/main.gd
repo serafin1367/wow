@@ -533,6 +533,7 @@ func _finish_training() -> void:
 	training_in_progress = false
 	var spawn_position: Vector3 = navigation.find_free_spawn_near(town_hall.global_position, workers.size())
 	_spawn_worker(spawn_position)
+	_update_resource_hud()
 	_set_status("Nowy robotnik jest gotowy! Liczba robotnikow: %d." % workers.size())
 	_update_action_buttons()
 
@@ -575,10 +576,12 @@ func _on_resource_delivered(resource_type: String, amount: int) -> void:
 func _update_resource_hud() -> void:
 	if resource_label == null:
 		return
-	resource_label.text = "Drewno: %d     Zloto: %d     Kamien: %d" % [
+	resource_label.text = "Drewno: %d     Zloto: %d     Kamien: %d     Robotnicy: %d/%d" % [
 		int(resource_totals["wood"]),
 		int(resource_totals["gold"]),
-		int(resource_totals["stone"])
+		int(resource_totals["stone"]),
+		workers.size(),
+		MAX_WORKERS
 	]
 
 
