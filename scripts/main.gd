@@ -8,6 +8,10 @@ const SELECTION_BOX_SCRIPT = preload("res://scripts/selection_box.gd")
 const RESOURCE_SCRIPT = preload("res://scripts/resource_node.gd")
 const TOWN_HALL_SCRIPT = preload("res://scripts/town_hall.gd")
 const FORESTER_SCRIPT = preload("res://scripts/forester_hut.gd")
+const LANDER_SCRIPT = preload("res://scripts/colony_lander.gd")
+const CHARGER_SCRIPT = preload("res://scripts/charging_pad.gd")
+const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
+const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
 const FORESTER_COST: Dictionary = {"wood": 30, "stone": 10}
 const FORESTER_RADIUS: float = 3.1
 const MAX_FORESTERS: int = 4
@@ -39,6 +43,11 @@ var build_mode: bool = false
 var town_hall: StaticBody3D
 var training_timer: Timer
 var training_in_progress: bool = false
+var landing_rocket: StaticBody3D
+var charging_pad: StaticBody3D
+var unit_status_label: Label
+var energy_label: Label
+var hud_elapsed: float = 0.0
 
 
 func _ready() -> void:
@@ -46,6 +55,7 @@ func _ready() -> void:
 	_create_ground()
 	_create_resources()
 	_create_depot()
+	_create_landing_site()
 	_create_workers()
 	_create_camera()
 	_create_hud()
@@ -269,6 +279,31 @@ func _create_depot() -> void:
 	depot.add_child(depot_name)
 
 
+func _create_landing_site() -> void:
+	# Rakieta jest juz po ladowaniu. Zostanie pozniej zastapiona animacja lotu.
+	landing_rocket = LANDER_SCRIPT.new()
+	landing_rocket.position = LANDER_POSITION
+	add_child(landing_rocket)
+	navigation.block_circle(Vector2(LANDER_POSITION.x, LANDER_POSITION.z), landing_rocket.get_access_radius())
+
+	charging_pad = CHARGER_SCRIPT.new()
+	charging_pad.position = CHARGER_POSITION
+	charging_pad.power_source = landing_rocket
+	add_child(charging_pad)
+	navigation.block_circle(Vector2(CHARGER_POSITION.x, CHARGER_POSITION.z), charging_pad.get_access_radius())
+
+	# Wizualny przewod energetyczny, poza siatka kolizji.
+	var cable := MeshInstance3D.new()
+	cable.name = "SolarPowerCable"
+	var line := BoxMesh.new()
+	line.size = Vector3(LANDER_POSITION.distance_to(CHARGER_POSITION), 0.10, 0.16)
+	cable.mesh = line
+	cable.position = (LANDER_POSITION + CHARGER_POSITION) * 0.5 + Vector3(0.0, 0.055, 0.0)
+	cable.rotation.y = atan2(CHARGER_POSITION.z - LANDER_POSITION.z, CHARGER_POSITION.x - LANDER_POSITION.x)
+	cable.material_override = _make_material(Color(0.09, 0.78, 0.85))
+	add_child(cable)
+
+
 func _on_resource_depleted(resource, clearance_radius: float) -> void:
 	var p: Vector3 = resource.global_position
 	navigation.unblock_circle(Vector2(p.x, p.z), clearance_radius)
@@ -277,18 +312,40 @@ func _on_resource_depleted(resource, clearance_radius: float) -> void:
 
 
 func _create_workers() -> void:
-	var starting_positions: Array[Vector3] = [
-		Vector3(-3.0, 0.0, 0.0),
-		Vector3(0.0, 0.0, 0.0),
-		Vector3(3.0, 0.0, 0.0)
+	# Wylot ze statku w strone kamery RTS. Jednostki ukazuja sie kolejno.
+	var robot_roles: Array[String] = ["miner", "hauler", "engineer"]
+	var rally: Array[Vector3] = [
+		Vector3(-4.0, 0.0, -2.0),
+		Vector3(0.0, 0.0, -3.0),
+		Vector3(4.0, 0.0, -2.0)
 	]
-	for start in starting_positions:
-		_spawn_worker(start)
+	for i in range(3):
+		var start := LANDER_POSITION + Vector3(float(i - 1) * 0.7, 0.0, 4.7)
+		var worker = _spawn_worker(start, robot_roles[i])
+		worker.visible = false
+		worker.set_physics_process(false)
+		get_tree().create_timer(0.7 + float(i) * 0.9).timeout.connect(
+			_launch_starting_robot.bind(worker, rally[i])
+		)
 
 
-func _spawn_worker(at_position: Vector3) -> CharacterBody3D:
+func _launch_starting_robot(worker: CharacterBody3D, destination: Vector3) -> void:
+	if not is_instance_valid(worker):
+		return
+	worker.visible = true
+	worker.set_physics_process(true)
+	var path: Array[Vector3] = navigation.find_path(worker.global_position, destination)
+	if not path.is_empty():
+		worker.command_move(path)
+	_announce_new_worker(worker)
+
+
+func _spawn_worker(at_position: Vector3, role: String = "miner") -> CharacterBody3D:
 	var worker = WORKER_SCRIPT.new()
-	worker.name = "Worker%d" % (workers.size() + 1)
+	worker.name = "Robot%d_%s" % [workers.size() + 1, role]
+	worker.robot_role = role
+	worker.charging_station = charging_pad
+	worker.navigation_grid = navigation
 	worker.position = at_position
 	add_child(worker)
 	worker.resource_delivered.connect(_on_resource_delivered)
@@ -298,7 +355,7 @@ func _spawn_worker(at_position: Vector3) -> CharacterBody3D:
 
 func _announce_new_worker(worker: CharacterBody3D) -> void:
 	var marker := Label3D.new()
-	marker.text = "NOWY ROBOTNIK"
+	marker.text = worker.role_name()
 	marker.position.y = 2.5
 	marker.font_size = 55
 	marker.pixel_size = 0.007
@@ -323,7 +380,7 @@ func _create_hud() -> void:
 	add_child(ui)
 	var hint := Label.new()
 	hint.name = "Controls"
-	hint.text = "WOW | LPM: wybierz | Przeciagnij LPM: grupa | PPM na surowcu: zbieraj | PPM na ziemi: idz | WASD: kamera"
+	hint.text = "WOW 0.2 | LPM: wybor | PPM: ruch / zadanie / naprawa | C: laduj | B: ratusz | L: lesniczowka"
 	hint.position = Vector2(16, 14)
 	hint.add_theme_font_size_override("font_size", 16)
 	hint.add_theme_color_override("font_color", Color.WHITE)
@@ -373,14 +430,57 @@ func _create_hud() -> void:
 	status_label.add_theme_constant_override("shadow_offset_x", 2)
 	status_label.add_theme_constant_override("shadow_offset_y", 2)
 	ui.add_child(status_label)
-	_set_status("Zbieraj surowce, potem postaw ratusz klawiszem B.")
+	_set_status("Trzy roboty wylatuja z rakiety. Technik: PPM na statku = naprawa.")
 	_update_action_buttons()
+
+	energy_label = Label.new()
+	energy_label.name = "SolarPowerStatus"
+	energy_label.position = Vector2(16, 158)
+	energy_label.add_theme_font_size_override("font_size", 17)
+	energy_label.add_theme_color_override("font_color", Color(0.35, 0.95, 1.0))
+	ui.add_child(energy_label)
+
+	var panel := PanelContainer.new()
+	panel.name = "SelectedRobotPanel"
+	panel.position = Vector2(16, 196)
+	panel.custom_minimum_size = Vector2(305, 80)
+	ui.add_child(panel)
+	unit_status_label = Label.new()
+	unit_status_label.name = "RobotInfo"
+	unit_status_label.add_theme_font_size_override("font_size", 17)
+	panel.add_child(unit_status_label)
+	_update_colony_hud()
 
 	selection_box = SELECTION_BOX_SCRIPT.new()
 	selection_box.name = "SelectionBox"
 	selection_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	selection_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui.add_child(selection_box)
+
+
+func _process(delta: float) -> void:
+	hud_elapsed += delta
+	if hud_elapsed >= 0.2:
+		hud_elapsed = 0.0
+		_update_colony_hud()
+
+
+func _update_colony_hud() -> void:
+	if energy_label != null and landing_rocket != null:
+		energy_label.text = "ENERGIA SLONECZNA: %.1f kW | Ladowarka: %s" % [
+			landing_rocket.solar_output(),
+			"AKTYWNA" if charging_pad.can_charge() else "NIEDOSTEPNA"
+		]
+	if unit_status_label != null:
+		if selected_workers.size() == 1:
+			var worker = selected_workers[0]
+			unit_status_label.text = "  %s | %s\\n  Akumulator: %d%% | Ladunek: %d\\n  [C] Jedz do ladowarki  " % [
+				worker.role_name(), worker.status_text(), roundi(worker.energy), worker.carried_amount
+			]
+		elif selected_workers.size() > 1:
+			unit_status_label.text = "  Wybrano %d robotow\\n  [C] Wyslij do ladowania  " % selected_workers.size()
+		else:
+			unit_status_label.text = "  LPM: wybierz robota\\n  PPM na statku: naprawa technikiem  "
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -393,6 +493,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_L:
 			_toggle_forester_mode()
+			return
+		if event.keycode == KEY_C:
+			for worker in selected_workers:
+				worker.command_charge()
+			_set_status("Rozkaz: roboty jada do stacji ladowania.")
 			return
 		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode):
 			build_mode = false
@@ -481,7 +586,28 @@ func _command_move_selected(screen_position: Vector2) -> void:
 		var clicked_object = resource_hit["collider"]
 		if clicked_object.has_method("harvest"):
 			for worker in selected_workers:
-				worker.command_gather(clicked_object, navigation, DEPOT_POSITION)
+				if worker.robot_role != "engineer":
+					worker.command_gather(clicked_object, navigation, DEPOT_POSITION)
+			_set_status("Roboty wydobywcze i transportowe zbieraja surowce.")
+			return
+		if clicked_object == charging_pad:
+			for worker in selected_workers:
+				if worker.robot_role == "engineer" and charging_pad.needs_repair():
+					worker.command_repair(charging_pad, navigation)
+				else:
+					worker.command_charge()
+			_set_status("Ladowarka: uzupelnianie energii / naprawa.")
+			return
+		if clicked_object.has_method("repair"):
+			var engineers: int = 0
+			for worker in selected_workers:
+				if worker.robot_role == "engineer":
+					worker.command_repair(clicked_object, navigation)
+					engineers += 1
+			if engineers > 0:
+				_set_status("Technik jedzie naprawic instalacje.")
+			else:
+				_set_status("Naprawy wymaga robota technicznego (zolty).")
 			return
 
 	var hit := _raycast(screen_position, 1)
@@ -579,6 +705,10 @@ func _is_build_site_clear(site: Vector3) -> bool:
 	for source in get_tree().get_nodes_in_group("resource_nodes"):
 		if (source.remaining > 0 or source.is_sapling) and _ground_distance(site, source.global_position) < TOWN_HALL_RADIUS + source.clearance_radius + 0.5:
 			return false
+	if _ground_distance(site, LANDER_POSITION) < TOWN_HALL_RADIUS + 4.5:
+		return false
+	if _ground_distance(site, CHARGER_POSITION) < TOWN_HALL_RADIUS + 3.0:
+		return false
 	for worker in workers:
 		if _ground_distance(site, worker.global_position) < TOWN_HALL_RADIUS + 0.5:
 			return false
@@ -641,6 +771,10 @@ func _is_forester_site_clear(site: Vector3) -> bool:
 		return false
 	if _ground_distance(site, DEPOT_POSITION) < FORESTER_RADIUS + DEPOT_BLOCK_RADIUS + 1.0:
 		return false
+	if _ground_distance(site, LANDER_POSITION) < FORESTER_RADIUS + 4.5:
+		return false
+	if _ground_distance(site, CHARGER_POSITION) < FORESTER_RADIUS + 3.0:
+		return false
 	if town_hall != null and _ground_distance(site, town_hall.global_position) < FORESTER_RADIUS + TOWN_HALL_RADIUS + 1.0:
 		return false
 	for hut in foresters:
@@ -689,6 +823,10 @@ func _is_tree_planting_site_clear(spot: Vector2, hut: StaticBody3D) -> bool:
 	if not navigation.is_circle_walkable(spot, 1.8):
 		return false
 	if _ground_distance(location, DEPOT_POSITION) < DEPOT_BLOCK_RADIUS + 2.8:
+		return false
+	if _ground_distance(location, LANDER_POSITION) < 6.6:
+		return false
+	if _ground_distance(location, CHARGER_POSITION) < 4.5:
 		return false
 	if town_hall != null and _ground_distance(location, town_hall.global_position) < TOWN_HALL_RADIUS + 2.8:
 		return false
