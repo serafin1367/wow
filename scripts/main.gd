@@ -66,6 +66,9 @@ var smelter_build_mode: bool = false
 var unused_power_kw: float = 0.0
 var ore_conveyor = null
 var metal_conveyor = null
+var manual_conveyor_kind: String = ""
+var manual_conveyor_points: Array[Vector3] = []
+var manual_conveyor_preview = null
 
 
 func _ready() -> void:
@@ -390,6 +393,7 @@ func _cycle_planet() -> void:
 
 
 func _cancel_build_modes() -> void:
+	_cancel_manual_conveyor()
 	build_mode = false
 	forester_build_mode = false
 	mine_build_mode = false
@@ -546,6 +550,86 @@ func _assign_factory_haulers(robots: Array) -> void:
 	_set_status("Transport przydzielony: %d robot(ow). PPM na ziemi przerywa zadanie." % assigned)
 
 
+func _start_manual_conveyor(kind: String) -> void:
+	if factory_mine == null or factory_smelter == null:
+		_set_status("Zbuduj najpierw kopalnie (M) i hute (H).")
+		return
+	if (kind == "ore" and ore_conveyor != null) or (kind == "metal" and metal_conveyor != null):
+		_set_status("To polaczenie jest juz zbudowane.")
+		return
+	var cost: Dictionary = ORE_CONVEYOR_COST if kind == "ore" else METAL_CONVEYOR_COST
+	if not _can_afford(cost):
+		_set_status("Brakuje metalu. Potrzeba %d sztabek." % int(cost["metal"]))
+		return
+	_cancel_build_modes()
+	manual_conveyor_kind = kind
+	manual_conveyor_points.clear()
+	_set_status("RECZNA TRASA %s: LPM dodaje punkty, Enter buduje, PPM/Esc anuluje." % kind.to_upper())
+
+
+func _manual_conveyor_click(mouse_position: Vector2) -> void:
+	if manual_conveyor_points.size() >= 12:
+		_set_status("Maksymalnie 12 punktow pomocniczych. Enter zatwierdzi trase.")
+		return
+	var ground_hit: Dictionary = _raycast(mouse_position, 1)
+	if ground_hit.is_empty():
+		_set_status("Wybierz punkt na terenie.")
+		return
+	var place: Vector3 = ground_hit["position"]
+	var waypoint := Vector3(roundf(place.x), 0.0, roundf(place.z))
+	if not navigation.is_circle_walkable(Vector2(waypoint.x, waypoint.z), 0.35):
+		_set_status("Punkt znajduje sie w przeszkodzie. Wybierz wolny teren.")
+		return
+	manual_conveyor_points.append(waypoint)
+	if not _refresh_manual_preview():
+		manual_conveyor_points.pop_back()
+		_refresh_manual_preview()
+		_set_status("Brak ciaglej trasy przez ten punkt. Sprobuj innego.")
+		return
+	_set_status("Dodano punkt %d. LPM dodaje kolejny; Enter buduje trase." % manual_conveyor_points.size())
+
+
+func _compute_conveyor_route(kind: String, waypoints: Array[Vector3] = []) -> Array[Vector3]:
+	var source_position: Vector3 = factory_mine.global_position if kind == "ore" else factory_smelter.global_position
+	var target_position: Vector3 = factory_smelter.global_position if kind == "ore" else DEPOT_POSITION
+	var source_radius: float = factory_mine.get_access_radius() if kind == "ore" else factory_smelter.get_access_radius()
+	var target_radius: float = factory_smelter.get_access_radius() if kind == "ore" else DEPOT_BLOCK_RADIUS
+	return navigation.find_conveyor_route_via(source_position, source_radius, target_position, target_radius, waypoints)
+
+
+func _refresh_manual_preview() -> bool:
+	if is_instance_valid(manual_conveyor_preview):
+		manual_conveyor_preview.queue_free()
+	manual_conveyor_preview = null
+	if manual_conveyor_kind == "":
+		return false
+	var route: Array[Vector3] = _compute_conveyor_route(manual_conveyor_kind, manual_conveyor_points)
+	if route.size() < 2 or route.size() > 95:
+		return false
+	manual_conveyor_preview = CONVEYOR_SCRIPT.new()
+	manual_conveyor_preview.preview_mode = true
+	manual_conveyor_preview.setup(manual_conveyor_kind,
+		factory_mine if manual_conveyor_kind == "ore" else factory_smelter,
+		factory_smelter if manual_conveyor_kind == "ore" else get_node("Stockpile"), route)
+	add_child(manual_conveyor_preview)
+	return true
+
+
+func _confirm_manual_conveyor() -> void:
+	if manual_conveyor_kind == "":
+		return
+	var kind: String = manual_conveyor_kind
+	_build_conveyor(kind, manual_conveyor_points)
+
+
+func _cancel_manual_conveyor() -> void:
+	if is_instance_valid(manual_conveyor_preview):
+		manual_conveyor_preview.queue_free()
+	manual_conveyor_preview = null
+	manual_conveyor_kind = ""
+	manual_conveyor_points.clear()
+
+
 func _build_ore_conveyor() -> void:
 	_build_conveyor("ore")
 
@@ -554,7 +638,7 @@ func _build_metal_conveyor() -> void:
 	_build_conveyor("metal")
 
 
-func _build_conveyor(kind: String) -> void:
+func _build_conveyor(kind: String, waypoints: Array[Vector3] = []) -> void:
 	if factory_mine == null or factory_smelter == null:
 		_set_status("Najpierw zbuduj kopalnie (M) i hute (H).")
 		return
@@ -570,16 +654,7 @@ func _build_conveyor(kind: String) -> void:
 		_set_status("Potrzeba %d metalu z huty, aby zbudowac tasme." % int(cost["metal"]))
 		return
 
-	var source_position: Vector3 = factory_mine.global_position if kind == "ore" else factory_smelter.global_position
-	var target_position: Vector3 = factory_smelter.global_position if kind == "ore" else DEPOT_POSITION
-	var source_radius: float = factory_mine.get_access_radius() if kind == "ore" else factory_smelter.get_access_radius()
-	var dest_radius: float = factory_smelter.get_access_radius() if kind == "ore" else DEPOT_BLOCK_RADIUS
-
-	# Prowadzimy tasme po bezpiecznych polach A* (bez zmiany kolizji ruchu robotow).
-	# Poczatkiem jest dostepny punkt wokol budynku, nie jego zablokowany srodek.
-	var route: Array[Vector3] = navigation.find_conveyor_route(
-		source_position, source_radius, target_position, dest_radius
-	)
+	var route: Array[Vector3] = _compute_conveyor_route(kind, waypoints)
 	if route.size() < 2:
 		_set_status("Nie mozna poprowadzic tasmy. Postaw budynki w dostepnej okolicy.")
 		return
@@ -588,6 +663,7 @@ func _build_conveyor(kind: String) -> void:
 		return
 	if not _spend_resources(cost):
 		return
+	_cancel_manual_conveyor()
 
 	var link = CONVEYOR_SCRIPT.new()
 	link.setup(kind, factory_mine if kind == "ore" else factory_smelter,
@@ -783,10 +859,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_smelter_mode()
 			return
 		if event.keycode == KEY_J:
-			_build_ore_conveyor()
+			if event.shift_pressed:
+				_start_manual_conveyor("ore")
+			else:
+				_build_ore_conveyor()
 			return
 		if event.keycode == KEY_N:
-			_build_metal_conveyor()
+			if event.shift_pressed:
+				_start_manual_conveyor("metal")
+			else:
+				_build_metal_conveyor()
+			return
+		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			if manual_conveyor_kind != "":
+				_confirm_manual_conveyor()
+				return
+		if event.keycode == KEY_ESCAPE and manual_conveyor_kind != "":
+			_cancel_manual_conveyor()
+			_set_status("Anulowano reczne ukladanie tasmy.")
 			return
 		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode):
 			_cancel_build_modes()
@@ -805,6 +895,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
+		if manual_conveyor_kind != "":
+			if event.pressed:
+				_manual_conveyor_click(event.position)
+			return
 		if mine_build_mode:
 			if event.pressed:
 				_try_place_mine(event.position)
@@ -835,6 +929,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_dragging = false
 
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if manual_conveyor_kind != "":
+			_cancel_manual_conveyor()
+			_set_status("Anulowano reczne ukladanie tasmy.")
+			return
 		if build_mode or forester_build_mode or mine_build_mode or smelter_build_mode:
 			_cancel_build_modes()
 			_set_status("Anulowano budowe.")
