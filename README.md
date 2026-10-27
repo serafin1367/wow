@@ -1,37 +1,49 @@
 # WOW — prototyp strategii czasu rzeczywistego
 
-Autorska gra RTS 3D inspirowana mechaniką klasycznych strategii. Projekt na **Godot 4.x** i **GDScript**, docelowo dla Windows.
+Autorska gra RTS 3D inspirowana mechaniką klasycznych strategii. Silnik: **Godot 4.x**, język: **GDScript**, platforma docelowa: Windows.
 
-## Pierwszy prototyp
+## Co jest już zaimplementowane
 
-- Płaska mapa 3D 100 × 100 jednostek.
+- Płaski teren 3D: 100 × 100 jednostek.
 - Kamera RTS: WASD, przesuwanie przy krawędziach okna, zoom kółkiem myszy.
-- Trzech robotników — tymczasowe modele 3D.
-- Wybieranie pojedynczej jednostki lewym przyciskiem; Shift + lewy przycisk dodaje do zaznaczenia.
-- Rozkaz przemieszczenia dla zaznaczonych jednostek prawym przyciskiem myszy.
-- 10 drzew, złoże złota, kamieniołom — **na razie elementy wizualne**, bez wydobycia i kolizji.
+- Trzech robotników (modele zastępcze).
+- **LPM**: wybór jednej jednostki.
+- **Przeciągnięcie LPM**: zaznaczenie prostokątem wielu jednostek.
+- **Shift + zaznaczanie**: dodawanie do aktualnego wyboru.
+- **PPM**: wydanie rozkazu ruchu zaznaczonym jednostkom.
+- **AStarGrid2D**: planowanie trasy wokół drzew i dwóch złóż surowców.
+- 10 drzew, kopalnia złota i kamieniołom (jeszcze bez wydobycia).
 
-## Jak uruchomić
+## Uruchomienie
 
-1. Zainstaluj Godot 4.x.
-2. Sklonuj repozytorium `git clone https://github.com/serafin1367/wow.git`.
-3. W Godot wybierz **Import**, wskaż `project.godot` i otwórz projekt.
-4. Uruchom scenę klawiszem **F6** albo cały projekt **F5**.
+1. Sklonuj repozytorium: `git clone https://github.com/serafin1367/wow.git`
+2. Jeśli projekt jest już otwarty w Godocie, pobierz zmiany poleceniem `git pull`, gdy gra jest zatrzymana.
+3. W Godot 4 otwórz projekt wskazując `project.godot`.
+4. Uruchom **F5**. W razie problemów sprawdź zakładki **Output** i **Debugger**.
+
+## Test ręczny
+
+1. Zaznacz pojedynczego robotnika i wyślij go PPM na inne miejsce mapy.
+2. Przeciągnij LPM wokół wszystkich trzech robotników; każdy powinien mieć zielone obramowanie.
+3. Wydaj rozkaz PPM po drugiej stronie grupy drzew albo kopalni. Robotnicy powinni przejść do punktu wyznaczoną trasą, zamiast przechodzić przez przeszkody.
+4. Sprawdź, czy **Shift + LPM** dodaje kolejnego robotnika do zaznaczenia.
+
+> Implementacja A* opiera się na uproszczonej, dyskretnej siatce terenu. Nie ma jeszcze lokalnego unikania zderzeń między jednostkami, animacji ani zbierania zasobów. Aktualna wersja czeka na test uruchomieniowy w Godocie.
 
 ## Struktura
 
-- `project.godot` — konfiguracja projektu.
+- `project.godot` — ustawienia.
 - `scenes/main.tscn` — scena startowa.
-- `scripts/main.gd` — generowanie świata, obiekty, zaznaczanie i polecenia.
-- `scripts/rts_camera.gd` — kamera.
-- `scripts/worker.gd` — robotnik i ruch.
+- `scripts/main.gd` — teren, drzewa, kopalnie, sterowanie.
+- `scripts/rts_camera.gd` — kamera RTS.
+- `scripts/worker.gd` — zachowanie jednostki i przechodzenie po punktach trasy.
+- `scripts/navigation_grid.gd` — A* oraz pola zablokowane.
+- `scripts/selection_box.gd` — podświetlenie prostokąta zaznaczenia.
 
-## Następne etapy
+## Następne kroki
 
-1. Test uruchomieniowy w edytorze Godot; naprawa ewentualnych błędów.
-2. Wielokrotne zaznaczanie jednostek prostokątem.
-3. NavigationMesh + unikanie przeszkód i kolizje obiektów świata.
-4. Zbieranie drewna, złota i kamienia, magazyn surowców.
-5. Budynki i produkcja jednostek.
-
-> To jest **pierwsza implementacja, niezweryfikowana jeszcze przez uruchomienie Godota**. Dla prostoty ruch prowadzi bezpośrednio do punktu, bez pathfindingu.
+1. Przetestować nową wersję i usunąć ewentualne błędy.
+2. Rozbudować selekcję (ikony, panel jednostek, grupy pod klawiszami).
+3. Dodać pozyskiwanie drewna, złota i kamienia oraz magazyn zasobów.
+4. Dodać bazę, budynki, produkcję jednostek.
+5. Opracować dwie autorskie frakcje.
