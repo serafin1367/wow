@@ -21,6 +21,7 @@ var preferred_resource_type: String = ""
 var navigation_grid = null
 var depot_position: Vector3 = Vector3.ZERO
 var harvest_elapsed: float = 0.0
+var idle_search_elapsed: float = 0.0
 var carried_type: String = ""
 var carried_amount: int = 0
 
@@ -74,6 +75,12 @@ func _physics_process(delta: float) -> void:
 
 	if state == WorkState.IDLE:
 		velocity = Vector3.ZERO
+		# Gdy lesnik wyhoduje nowe drzewo, dawny drwal wznowi prace sam.
+		if preferred_resource_type != "" and navigation_grid != null:
+			idle_search_elapsed += delta
+			if idle_search_elapsed >= 2.0:
+				idle_search_elapsed = 0.0
+				_go_to_resource()
 		return
 
 	while next_waypoint < waypoints.size():
