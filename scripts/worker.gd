@@ -41,6 +41,8 @@ var factory_smelter = null
 var factory_route_active: bool = false
 var factory_stage: String = "pickup"
 var factory_wait_elapsed: float = 0.0
+var ore_belt_enabled: bool = false
+var metal_belt_enabled: bool = false
 
 
 func _ready() -> void:
@@ -215,6 +217,13 @@ func command_factory_route(mine: Node3D, smelter: Node3D, grid: RefCounted, drop
 		_travel_factory_stage("pickup")
 
 
+func set_factory_belts(ore_active: bool, metal_active: bool) -> void:
+	ore_belt_enabled = ore_active
+	metal_belt_enabled = metal_active
+	if factory_route_active and carried_amount == 0:
+		_travel_factory_stage("pickup")
+
+
 func _travel_factory_stage(next_stage: String) -> void:
 	if not factory_route_active or navigation_grid == null:
 		state = WorkState.IDLE
@@ -223,6 +232,20 @@ func _travel_factory_stage(next_stage: String) -> void:
 		factory_route_active = false
 		state = WorkState.IDLE
 		return
+
+	# Dokoncz aktualny transport przy zmianie robot -> tasmociag.
+	if carried_type == "iron_ore" and carried_amount > 0:
+		next_stage = "input"
+	elif carried_type == "metal" and carried_amount > 0:
+		next_stage = "depot"
+	elif next_stage == "pickup" and ore_belt_enabled:
+		next_stage = "output"
+
+	if next_stage == "output" and metal_belt_enabled and carried_amount == 0:
+		factory_route_active = false
+		state = WorkState.IDLE
+		return
+
 	factory_stage = next_stage
 	var destination: Vector3 = depot_position
 	var radius: float = 3.5
@@ -231,7 +254,7 @@ func _travel_factory_stage(next_stage: String) -> void:
 		destination = factory_mine.global_position
 		radius = factory_mine.get_access_radius() + 0.5
 		next_state = WorkState.TO_FACTORY_PICKUP
-	elif next_stage == "input":
+	elif next_stage == "input" or next_stage == "output":
 		destination = factory_smelter.global_position
 		radius = factory_smelter.get_access_radius() + 0.5
 		next_state = WorkState.TO_FACTORY_INPUT
@@ -264,6 +287,9 @@ func _process_factory_wait(delta: float) -> void:
 			carried_amount += ore
 		if carried_amount >= 12 or (carried_amount > 0 and not factory_mine.has_ore()):
 			_travel_factory_stage("input")
+		elif ore_belt_enabled and carried_amount == 0:
+			_travel_factory_stage("output")
+
 	elif state == WorkState.WAIT_FACTORY_OUTPUT:
 		if carried_type == "iron_ore" and carried_amount > 0:
 			var accepted: int = factory_smelter.deposit_ore(carried_amount)
@@ -271,16 +297,23 @@ func _process_factory_wait(delta: float) -> void:
 			if carried_amount == 0:
 				carried_type = ""
 			else:
-				# Bufor odbiorczy pelny: czekamy przy hucie.
+				# Bufor odbiorczy pelny: nie zgub rudy.
 				return
+
+		if metal_belt_enabled:
+			# Transport powrotny przejela tasma. Robot moze zajac sie innym zadaniem.
+			_travel_factory_stage("pickup")
+			return
+
 		var metal: int = factory_smelter.collect_metal(25)
 		if metal > 0:
 			carried_type = "metal"
 			carried_amount = metal
 			_travel_factory_stage("depot")
-		elif factory_smelter.ore_stock < 2 and factory_mine.stock > 0:
+		elif not ore_belt_enabled and factory_smelter.ore_stock < 2 and factory_mine.stock > 0:
 			_travel_factory_stage("pickup")
-		elif factory_smelter.ore_stock == 0 and factory_mine.stock == 0 and not factory_mine.has_ore():
+		elif not ore_belt_enabled and factory_smelter.ore_stock == 0 and factory_mine.stock == 0 and not factory_mine.has_ore():
+			factory_route_active = false
 			state = WorkState.IDLE
 
 
