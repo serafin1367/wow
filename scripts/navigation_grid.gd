@@ -115,6 +115,32 @@ func find_access_path(origin: Vector3, center: Vector3, clearance_radius: float)
 				best = path
 	return best
 
+func find_conveyor_route(source: Vector3, source_radius: float, target: Vector3, target_radius: float) -> Array[Vector3]:
+	# Zaden odcinek nie zaczyna sie wewnatrz kolizji budynku. Sprawdzamy
+	# dostepne punkty otaczajace wylot i prowadzimy omijajaca przeszkody trase A*.
+	var best: Array[Vector3] = []
+	for offset in [0.8, 1.5]:
+		for i in range(16):
+			var angle: float = TAU * float(i) / 16.0
+			var distance: float = source_radius + offset
+			var candidate := Vector3(
+				source.x + cos(angle) * distance, 0.0,
+				source.z + sin(angle) * distance
+			)
+			var point: Vector2i = _world_to_cell(candidate)
+			if grid.is_point_solid(point):
+				continue
+			var start := Vector3(float(point.x), 0.0, float(point.y))
+			var route: Array[Vector3] = find_access_path(start, target, target_radius + 0.65)
+			if route.size() < 2:
+				continue
+			if best.is_empty() or route.size() < best.size():
+				best = route
+				if route.size() <= 4:
+					return best
+	return best
+
+
 func find_path(origin: Vector3, target: Vector3) -> Array[Vector3]:
 	var from_id := _world_to_cell(origin)
 	var to_id := _nearest_walkable(_world_to_cell(target))
