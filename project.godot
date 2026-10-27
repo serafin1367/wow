@@ -1,0 +1,15 @@
+; WOW — prototyp RTS 3D w Godot 4.x
+config_version=5
+
+[application]
+config/name="WOW"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.0", "GL Compatibility")
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
