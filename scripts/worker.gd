@@ -1,24 +1,24 @@
 extends CharacterBody3D
-## Tymczasowy robotnik; proste przemieszczanie w linii prostej po plaskiej mapie.
-## Omijanie przeszkod i nawigacja grupowa to osobny etap.
+## Robotnik idzie po punktach trasy wyznaczonej przez AStarGrid2D.
 
 @export var move_speed: float = 6.0
 
-var destination: Vector3 = Vector3.ZERO
-var has_destination: bool = false
+var waypoints: Array[Vector3] = []
+var next_waypoint: int = 0
 var selection_ring: MeshInstance3D
 
 
 func _ready() -> void:
 	collision_layer = 2
-	collision_mask = 0
+	# Kolizje ze stalymi przeszkodami, bez wzajemnego blokowania robotnikow.
+	collision_mask = 4
 
-	var shape := CapsuleShape3D.new()
-	shape.radius = 0.45
-	shape.height = 1.8
+	var capsule_shape := CapsuleShape3D.new()
+	capsule_shape.radius = 0.45
+	capsule_shape.height = 1.8
 	var collision := CollisionShape3D.new()
 	collision.name = "Collision"
-	collision.shape = shape
+	collision.shape = capsule_shape
 	collision.position.y = 0.9
 	add_child(collision)
 
@@ -50,24 +50,27 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not has_destination:
+	while next_waypoint < waypoints.size():
+		var offset := waypoints[next_waypoint] - global_position
+		offset.y = 0.0
+		if offset.length() <= 0.16:
+			next_waypoint += 1
+		else:
+			break
+
+	if next_waypoint >= waypoints.size():
 		velocity = Vector3.ZERO
 		return
 
-	var difference := destination - global_position
+	var difference := waypoints[next_waypoint] - global_position
 	difference.y = 0.0
-	if difference.length() < 0.12:
-		has_destination = false
-		velocity = Vector3.ZERO
-		return
-
 	velocity = difference.normalized() * minf(move_speed, difference.length() / maxf(delta, 0.001))
 	move_and_slide()
 
 
-func command_move(target: Vector3) -> void:
-	destination = Vector3(clampf(target.x, -48.0, 48.0), 0.0, clampf(target.z, -48.0, 48.0))
-	has_destination = true
+func command_move(new_path: Array[Vector3]) -> void:
+	waypoints = new_path
+	next_waypoint = 0
 
 
 func set_selected(value: bool) -> void:
