@@ -7,13 +7,13 @@ signal build_forester_requested
 signal train_robot_requested
 signal charge_requested
 
-const BG := Color(0.065, 0.105, 0.145, 0.94)
-const BG_SUBTLE := Color(0.105, 0.16, 0.20, 0.96)
-const BORDER := Color(0.23, 0.34, 0.39, 1.0)
-const TEXT := Color(0.91, 0.96, 0.96)
-const MUTED := Color(0.62, 0.72, 0.76)
-const TURQUOISE := Color(0.25, 0.88, 0.90)
-const ORANGE := Color(1.0, 0.61, 0.22)
+const BG = Color(0.065, 0.105, 0.145, 0.94)
+const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
+const BORDER = Color(0.23, 0.34, 0.39, 1.0)
+const TEXT = Color(0.91, 0.96, 0.96)
+const MUTED = Color(0.62, 0.72, 0.76)
+const TURQUOISE = Color(0.25, 0.88, 0.90)
+const ORANGE = Color(1.0, 0.61, 0.22)
 
 var root: Control
 var resource_label: Label
