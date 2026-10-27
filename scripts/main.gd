@@ -577,14 +577,9 @@ func _build_conveyor(kind: String) -> void:
 
 	# Prowadzimy tasme po bezpiecznych polach A* (bez zmiany kolizji ruchu robotow).
 	# Poczatkiem jest dostepny punkt wokol budynku, nie jego zablokowany srodek.
-	var near_source: Array[Vector3] = navigation.find_access_path(
-		target_position, source_position, source_radius + 0.9
+	var route: Array[Vector3] = navigation.find_conveyor_route(
+		source_position, source_radius, target_position, dest_radius
 	)
-	if near_source.is_empty():
-		_set_status("Brak dostepnego podejscia do wyjscia budynku.")
-		return
-	var start: Vector3 = near_source[near_source.size() - 1]
-	var route: Array[Vector3] = navigation.find_access_path(start, target_position, dest_radius + 0.9)
 	if route.size() < 2:
 		_set_status("Nie mozna poprowadzic tasmy. Postaw budynki w dostepnej okolicy.")
 		return
@@ -596,7 +591,7 @@ func _build_conveyor(kind: String) -> void:
 
 	var link = CONVEYOR_SCRIPT.new()
 	link.setup(kind, factory_mine if kind == "ore" else factory_smelter,
-		factory_smelter if kind == "ore" else get_node("Depot"), route)
+		factory_smelter if kind == "ore" else get_node("Stockpile"), route)
 	add_child(link)
 	if kind == "ore":
 		ore_conveyor = link
@@ -607,7 +602,7 @@ func _build_conveyor(kind: String) -> void:
 	_sync_factory_haulers()
 	_update_action_buttons()
 	_set_status("Podlaczono %s. Obserwuj przesuwajace sie paczki i prace robotow." % (
-		"ru­de z kopalni do huty" if kind == "ore" else "metal z huty do magazynu"
+		"rude z kopalni do huty" if kind == "ore" else "metal z huty do magazynu"
 	))
 
 
