@@ -6,6 +6,7 @@ signal build_center_requested
 signal build_forester_requested
 signal train_robot_requested
 signal charge_requested
+signal planet_change_requested
 
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
@@ -27,6 +28,7 @@ var build_button: Button
 var forester_button: Button
 var train_button: Button
 var charge_button: Button
+var planet_button: Button
 
 
 func _ready() -> void:
@@ -74,13 +76,23 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.3", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.5", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 18, TEXT, true)
 	resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(resource_label)
 
+	row.add_child(VSeparator.new())
+	var planet_block := VBoxContainer.new()
+	planet_block.custom_minimum_size.x = 123
+	planet_block.add_child(_label("PLANETA  [P]", 11, MUTED, true))
+	planet_button = _action_button("MARS", "Zmien biom: Ziemia / Mars / Kepler", ORANGE)
+	planet_button.custom_minimum_size = Vector2(121, 32)
+	planet_button.add_theme_font_size_override("font_size", 12)
+	planet_button.pressed.connect(func(): planet_change_requested.emit())
+	planet_block.add_child(planet_button)
+	row.add_child(planet_block)
 	row.add_child(VSeparator.new())
 	var power_block := VBoxContainer.new()
 	power_block.custom_minimum_size.x = 207
@@ -169,6 +181,11 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("PPM   Ruch / zadanie", 13, TEXT))
 	help.add_child(_label("WASD   Kamera", 13, TEXT))
 	help.add_child(_label("ESC   Anuluj budowe", 13, TEXT))
+
+
+func set_planet(planet: String) -> void:
+	if planet_button != null:
+		planet_button.text = planet.to_upper()
 
 
 func set_resources(wood: int, gold: int, stone: int, population: int, cap: int) -> void:
