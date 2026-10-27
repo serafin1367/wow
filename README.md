@@ -1,49 +1,72 @@
 # WOW — prototyp strategii czasu rzeczywistego
 
-Autorska gra RTS 3D inspirowana mechaniką klasycznych strategii. Silnik: **Godot 4.x**, język: **GDScript**, platforma docelowa: Windows.
+Autorski RTS 3D na **Godot 4.x / GDScript**, docelowo dla Windows. Grafika jest tymczasowa, bez zewnętrznych assetów.
 
-## Co jest już zaimplementowane
+## Dostępne funkcje
 
-- Płaski teren 3D: 100 × 100 jednostek.
-- Kamera RTS: WASD, przesuwanie przy krawędziach okna, zoom kółkiem myszy.
-- Trzech robotników (modele zastępcze).
-- **LPM**: wybór jednej jednostki.
-- **Przeciągnięcie LPM**: zaznaczenie prostokątem wielu jednostek.
-- **Shift + zaznaczanie**: dodawanie do aktualnego wyboru.
-- **PPM**: wydanie rozkazu ruchu zaznaczonym jednostkom.
-- **AStarGrid2D**: planowanie trasy wokół drzew i dwóch złóż surowców.
-- 10 drzew, kopalnia złota i kamieniołom (jeszcze bez wydobycia).
+- Mapa 3D 100 × 100 z kamerą RTS (WASD, krawędzie ekranu, kółko myszy).
+- Trzy jednostki sterowane prawym przyciskiem myszy, zaznaczanie pojedyncze i grupowe.
+- Ruch z wyznaczaniem ścieżek **AStarGrid2D**, omijaniem drzew i złóż.
+- **Drewno, złoto i kamień** — złoża mają ograniczoną pojemność i znikają po wyczerpaniu.
+- Praca robotników: podejście do surowca, zbieranie, transport maksymalnie **10 jednostek** do magazynu, kolejna wyprawa.
+- Magazyn w centrum mapy oraz licznik zgromadzonych zasobów u góry ekranu.
+- Rozkaz ruchu do innego miejsca przerywa wykonywane zadanie zbierania.
 
-## Uruchomienie
+## Instalacja / aktualizacja
 
-1. Sklonuj repozytorium: `git clone https://github.com/serafin1367/wow.git`
-2. Jeśli projekt jest już otwarty w Godocie, pobierz zmiany poleceniem `git pull`, gdy gra jest zatrzymana.
-3. W Godot 4 otwórz projekt wskazując `project.godot`.
-4. Uruchom **F5**. W razie problemów sprawdź zakładki **Output** i **Debugger**.
+Pobierz najnowszą wersję kodu:
 
-## Test ręczny
+```bash
+git clone https://github.com/serafin1367/wow.git
+```
 
-1. Zaznacz pojedynczego robotnika i wyślij go PPM na inne miejsce mapy.
-2. Przeciągnij LPM wokół wszystkich trzech robotników; każdy powinien mieć zielone obramowanie.
-3. Wydaj rozkaz PPM po drugiej stronie grupy drzew albo kopalni. Robotnicy powinni przejść do punktu wyznaczoną trasą, zamiast przechodzić przez przeszkody.
-4. Sprawdź, czy **Shift + LPM** dodaje kolejnego robotnika do zaznaczenia.
+Jeśli masz już klon, zatrzymaj grę i wykonaj w katalogu projektu:
 
-> Implementacja A* opiera się na uproszczonej, dyskretnej siatce terenu. Nie ma jeszcze lokalnego unikania zderzeń między jednostkami, animacji ani zbierania zasobów. Aktualna wersja czeka na test uruchomieniowy w Godocie.
+```bash
+git pull origin main
+```
 
-## Struktura
+Otwórz `project.godot` w Godot 4 i naciśnij **F5**.
 
-- `project.godot` — ustawienia.
-- `scenes/main.tscn` — scena startowa.
-- `scripts/main.gd` — teren, drzewa, kopalnie, sterowanie.
-- `scripts/rts_camera.gd` — kamera RTS.
-- `scripts/worker.gd` — zachowanie jednostki i przechodzenie po punktach trasy.
-- `scripts/navigation_grid.gd` — A* oraz pola zablokowane.
-- `scripts/selection_box.gd` — podświetlenie prostokąta zaznaczenia.
+## Sterowanie
 
-## Następne kroki
+| Akcja | Klawisz / przycisk |
+|---|---|
+| Zaznaczenie jednostki | LPM |
+| Zaznaczenie prostokątem | Przeciągnięcie LPM |
+| Dodanie do zaznaczenia | Shift + LPM / Shift + przeciągnięcie |
+| Ruch | PPM na ziemi |
+| Zbieranie | PPM na drzewie, złocie lub kamieniu |
+| Ruch kamery | WASD lub krawędzie ekranu |
+| Przybliżenie / oddalenie | Kółko myszy |
 
-1. Przetestować nową wersję i usunąć ewentualne błędy.
-2. Rozbudować selekcję (ikony, panel jednostek, grupy pod klawiszami).
-3. Dodać pozyskiwanie drewna, złota i kamienia oraz magazyn zasobów.
-4. Dodać bazę, budynki, produkcję jednostek.
-5. Opracować dwie autorskie frakcje.
+## Test ręczny: ekonomia
+
+1. Zaznacz jednego z trzech robotników.
+2. Przesuń kamerę w stronę drzew i kliknij **PPM na koronie lub pniu drzewa**.
+3. Robotnik powinien dojść do drzewa, zbierać przez kilka sekund, wrócić do **MAGAZYNU** (na środku mapy), a licznik **Drewno** powinien wzrosnąć o 10.
+4. Wybierz drugiego robotnika i kliknij PPM na **złożu złota**, trzeciego wyślij do **kamieniołomu**.
+5. Zaczekaj, aż wszyscy dostarczą swoje ładunki. Obserwuj trzy liczniki.
+6. Spróbuj zaznaczyć grupę i wysłać ją do jednego drzewa. Gdy wyczerpie się jego zasób, obiekt powinien zniknąć i zwolnić drogę.
+
+**Stan testów:** zmian nie uruchomiono jeszcze w silniku Godot w tym środowisku. W razie błędów prześlij komunikaty z zakładki Debugger.
+
+## Struktura skryptów
+
+- `scripts/main.gd` — mapa, wejście myszą, magazyn, ekonomia i HUD.
+- `scripts/worker.gd` — rozkazy ruchu oraz cykl zbierania/dostarczania.
+- `scripts/resource_node.gd` — zasoby z ograniczoną pojemnością.
+- `scripts/navigation_grid.gd` — trasy A* i dynamiczne zwalnianie pól.
+- `scripts/rts_camera.gd` — kamera.
+- `scripts/selection_box.gd` — zaznaczanie wielu jednostek.
+
+## Ograniczenia
+
+- Nie ma animacji, budowania, produkcji jednostek ani walki.
+- Trasy są wyznaczane na płaskiej siatce; brak lokalnego unikania pozostałych robotników.
+- Nie ma zapisu gry ani automatycznego przydziału nowych złóż po wyczerpaniu starego.
+- Rozkaz ruchu może przerwać transport ładunku; w tej wersji robotnik przechowuje go do kolejnego rozkazu zbierania, kiedy może go odłożyć w magazynie.
+
+## Następny etap
+
+Budowa pierwszego ratusza, produkcja robotników i system kosztów w surowcach.
