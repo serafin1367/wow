@@ -47,6 +47,16 @@ jobs:
             echo "Factory integration test failed."
             exit 1
           fi
+      - name: Test conveyor belts routing and material balance
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/conveyor_smoke.gd 2>&1 | tee /tmp/wow-conveyor.log
+          grep -F 'CONVEYOR SMOKE OK' /tmp/wow-conveyor.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|CONVEYOR TEST:' /tmp/wow-conveyor.log; then
+            echo "Conveyor integration test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
