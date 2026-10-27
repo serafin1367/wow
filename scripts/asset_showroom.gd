@@ -59,8 +59,8 @@ func _ready() -> void:
 
 	var camera := Camera3D.new()
 	camera.current = true
-	camera.position = Vector3(0, 26, 36)
-	camera.look_at(Vector3(0, 1, -1), Vector3.UP)
+	camera.position = Vector3(-2, 33, 50)
+	camera.look_at(Vector3(-4, 5, -2), Vector3.UP)
 	camera.fov = 65.0
 	add_child(camera)
 
