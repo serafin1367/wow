@@ -1,10 +1,10 @@
 extends StaticBody3D
-## Zrodlo surowca: drzewo, zloto albo kamien.
+## Zrodlo surowca: drzewo, zloto, kamien albo ruda zelaza.
 ## Po wyczerpaniu znika i przestaje blokowac droge.
 
 signal depleted(resource, clearance_radius)
 
-@export_enum("wood", "gold", "stone") var resource_type: String = "wood"
+@export_enum("wood", "gold", "stone", "iron_ore") var resource_type: String = "wood"
 @export var remaining: int = 100
 @export var clearance_radius: float = 1.6
 var is_sapling: bool = false
