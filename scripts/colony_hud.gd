@@ -7,6 +7,8 @@ signal build_forester_requested
 signal train_robot_requested
 signal charge_requested
 signal planet_change_requested
+signal mine_requested
+signal smelter_requested
 
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
@@ -29,6 +31,9 @@ var forester_button: Button
 var train_button: Button
 var charge_button: Button
 var planet_button: Button
+var mine_button: Button
+var smelter_button: Button
+var balance_label: Label
 
 
 func _ready() -> void:
@@ -41,7 +46,7 @@ func _ready() -> void:
 
 	_make_top_bar()
 	_make_bottom_bar()
-	set_resources(0, 0, 0, 3, 30)
+	set_resources(0, 0, 0, 0, 3, 30)
 	set_power(0.0, false)
 	set_no_selection()
 
@@ -76,10 +81,10 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.5", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.6", 11, MUTED))
 	row.add_child(VSeparator.new())
 
-	resource_label = _label("", 18, TEXT, true)
+	resource_label = _label("", 15, TEXT, true)
 	resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(resource_label)
 
@@ -99,6 +104,8 @@ func _make_top_bar() -> void:
 	power_block.add_child(_label("ENERGIA KOLONII", 11, MUTED, true))
 	energy_label = _label("", 16, TURQUOISE, true)
 	power_block.add_child(energy_label)
+	balance_label = _label("REZERWA: 0.0 kW", 11, MUTED)
+	power_block.add_child(balance_label)
 	row.add_child(power_block)
 
 
@@ -166,6 +173,18 @@ func _make_bottom_bar() -> void:
 	charge_button.pressed.connect(func(): charge_requested.emit())
 	actions.add_child(charge_button)
 
+	var factory_actions := HBoxContainer.new()
+	factory_actions.add_theme_constant_override("separation", 8)
+	center.add_child(factory_actions)
+	mine_button = _action_button("M   KOPALNIA ZELAZA", "20 drewna · 10 kamienia. LPM na zlozu zelaza.", ORANGE)
+	mine_button.custom_minimum_size.y = 37
+	mine_button.pressed.connect(func(): mine_requested.emit())
+	factory_actions.add_child(mine_button)
+	smelter_button = _action_button("H   HUTA METALU", "30 drewna · 20 kamienia. LPM na wolnym terenie.", TURQUOISE)
+	smelter_button.custom_minimum_size.y = 37
+	smelter_button.pressed.connect(func(): smelter_requested.emit())
+	factory_actions.add_child(smelter_button)
+
 	event_label = _label("Gotowosc systemow kolonii.", 13, TEXT)
 	event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	event_label.clip_text = true
@@ -188,16 +207,28 @@ func set_planet(planet: String) -> void:
 		planet_button.text = planet.to_upper()
 
 
-func set_resources(wood: int, gold: int, stone: int, population: int, cap: int) -> void:
+func set_resources(wood: int, gold: int, stone: int, metal: int, population: int, cap: int) -> void:
 	if resource_label != null:
-		resource_label.text = "DREWNO   %d       ZLOTO   %d       KAMIEN   %d       ROBOTY   %d/%d" % [
-			wood, gold, stone, population, cap
+		resource_label.text = "DREWNO %d    ZLOTO %d    KAMIEN %d    METAL %d    ROBOTY %d/%d" % [
+			wood, gold, stone, metal, population, cap
 		]
 
 
 func set_power(power_kw: float, active: bool) -> void:
 	if energy_label != null:
 		energy_label.text = "%.1f kW  /  %s" % [power_kw, "LADOWANIE OK" if active else "BRAK ZASILANIA"]
+
+
+func set_power_balance(available_kw: float) -> void:
+	if balance_label != null:
+		balance_label.text = "REZERWA: %.1f kW" % available_kw
+
+
+func set_factory_availability(mine_exists: bool, smelter_exists: bool) -> void:
+	if mine_button != null:
+		mine_button.disabled = mine_exists
+	if smelter_button != null:
+		smelter_button.disabled = smelter_exists
 
 
 func set_status(message: String) -> void:
