@@ -37,6 +37,16 @@ jobs:
             echo "Godot runtime errors detected in asset showroom."
             exit 1
           fi
+      - name: Test mine smelter transport and power accounting
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/factory_smoke.gd 2>&1 | tee /tmp/wow-factory.log
+          grep -F 'FACTORY SMOKE OK' /tmp/wow-factory.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|FACTORY TEST:' /tmp/wow-factory.log; then
+            echo "Factory integration test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
