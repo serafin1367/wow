@@ -299,7 +299,7 @@ func _create_landing_site() -> void:
 	line.size = Vector3(LANDER_POSITION.distance_to(CHARGER_POSITION), 0.10, 0.16)
 	cable.mesh = line
 	cable.position = (LANDER_POSITION + CHARGER_POSITION) * 0.5 + Vector3(0.0, 0.055, 0.0)
-	cable.rotation.y = atan2(CHARGER_POSITION.z - LANDER_POSITION.z, CHARGER_POSITION.x - LANDER_POSITION.x)
+	cable.rotation.y = -atan2(CHARGER_POSITION.z - LANDER_POSITION.z, CHARGER_POSITION.x - LANDER_POSITION.x)
 	cable.material_override = _make_material(Color(0.09, 0.78, 0.85))
 	add_child(cable)
 
