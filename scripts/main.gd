@@ -43,8 +43,8 @@ var build_mode: bool = false
 var town_hall: StaticBody3D
 var training_timer: Timer
 var training_in_progress: bool = false
-var landing_rocket: StaticBody3D
-var charging_pad: StaticBody3D
+var landing_rocket = null
+var charging_pad = null
 var unit_status_label: Label
 var energy_label: Label
 var hud_elapsed: float = 0.0
@@ -329,7 +329,7 @@ func _create_workers() -> void:
 		)
 
 
-func _launch_starting_robot(worker: CharacterBody3D, destination: Vector3) -> void:
+func _launch_starting_robot(worker, destination: Vector3) -> void:
 	if not is_instance_valid(worker):
 		return
 	worker.visible = true
@@ -340,7 +340,7 @@ func _launch_starting_robot(worker: CharacterBody3D, destination: Vector3) -> vo
 	_announce_new_worker(worker)
 
 
-func _spawn_worker(at_position: Vector3, role: String = "miner") -> CharacterBody3D:
+func _spawn_worker(at_position: Vector3, role: String = "miner"):
 	var worker = WORKER_SCRIPT.new()
 	worker.name = "Robot%d_%s" % [workers.size() + 1, role]
 	worker.robot_role = role
@@ -353,7 +353,7 @@ func _spawn_worker(at_position: Vector3, role: String = "miner") -> CharacterBod
 	return worker
 
 
-func _announce_new_worker(worker: CharacterBody3D) -> void:
+func _announce_new_worker(worker) -> void:
 	var marker := Label3D.new()
 	marker.text = worker.role_name()
 	marker.position.y = 2.5
