@@ -92,7 +92,7 @@ func _run_test() -> void:
 		return
 
 	# Uszkodzenie PV ponizej progu ma wstrzymac wydobycie.
-	game.landing_rocket.health = 20.0
+	game.landing_rocket.health = 5.0
 	game._update_factory_power()
 	if mine.power_enabled or smelter.power_enabled:
 		_fail("Fabryka dziala bez wymaganej energii")
