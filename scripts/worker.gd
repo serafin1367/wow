@@ -6,7 +6,7 @@ signal resource_delivered(resource_type: String, quantity: int)
 
 const MODEL_SCRIPT = preload("res://scripts/robot_model.gd")
 
-enum WorkState { IDLE, MOVING, TO_RESOURCE, GATHERING, TO_DEPOT, TO_CHARGER, CHARGING, TO_REPAIR, REPAIRING }
+enum WorkState { IDLE, MOVING, TO_RESOURCE, GATHERING, TO_DEPOT, TO_CHARGER, CHARGING, TO_REPAIR, REPAIRING, TO_FACTORY_PICKUP, WAIT_FACTORY_PICKUP, TO_FACTORY_INPUT, WAIT_FACTORY_OUTPUT, TO_FACTORY_DEPOT }
 
 const BATTERY_MAX: float = 100.0
 const LOW_BATTERY: float = 22.0
@@ -36,6 +36,11 @@ var carried_amount: int = 0
 
 var suspended_state: WorkState = WorkState.IDLE
 var suspended_destination: Vector3 = Vector3.ZERO
+var factory_mine = null
+var factory_smelter = null
+var factory_route_active: bool = false
+var factory_stage: String = "pickup"
+var factory_wait_elapsed: float = 0.0
 
 
 func _ready() -> void:
@@ -105,6 +110,11 @@ func _physics_process(delta: float) -> void:
 		_process_repair(delta)
 		return
 
+	if state == WorkState.WAIT_FACTORY_PICKUP or state == WorkState.WAIT_FACTORY_OUTPUT:
+		velocity = Vector3.ZERO
+		_process_factory_wait(delta)
+		return
+
 	if state == WorkState.IDLE:
 		velocity = Vector3.ZERO
 		if preferred_resource_type != "" and navigation_grid != null and energy > LOW_BATTERY:
@@ -138,6 +148,7 @@ func _physics_process(delta: float) -> void:
 
 
 func command_move(new_path: Array[Vector3]) -> void:
+	factory_route_active = false
 	resource_target = null
 	repair_target = null
 	preferred_resource_type = ""
@@ -149,8 +160,9 @@ func command_move(new_path: Array[Vector3]) -> void:
 func command_gather(target: Node3D, grid: RefCounted, drop_point: Vector3) -> void:
 	if robot_role == "engineer":
 		return
-	if not is_instance_valid(target) or not target.has_method("harvest"):
+	if not is_instance_valid(target) or not target.has_method("harvest") or target.resource_type == "iron_ore":
 		return
+	factory_route_active = false
 	repair_target = null
 	resource_target = target
 	preferred_resource_type = target.resource_type
@@ -167,6 +179,7 @@ func command_repair(target: Node3D, grid: RefCounted) -> void:
 		return
 	if not is_instance_valid(target) or not target.has_method("repair"):
 		return
+	factory_route_active = false
 	preferred_resource_type = ""
 	resource_target = null
 	repair_target = target
@@ -175,12 +188,100 @@ func command_repair(target: Node3D, grid: RefCounted) -> void:
 
 
 func command_charge() -> void:
+	factory_route_active = false
 	preferred_resource_type = ""
 	resource_target = null
 	repair_target = null
 	suspended_state = WorkState.IDLE
 	if not _navigate_to_charger():
 		state = WorkState.IDLE
+
+
+func command_factory_route(mine: Node3D, smelter: Node3D, grid: RefCounted, drop_point: Vector3) -> void:
+	if robot_role != "hauler" or not is_instance_valid(mine) or not is_instance_valid(smelter):
+		return
+	factory_mine = mine
+	factory_smelter = smelter
+	factory_route_active = true
+	factory_stage = "pickup"
+	preferred_resource_type = ""
+	resource_target = null
+	repair_target = null
+	navigation_grid = grid
+	depot_position = drop_point
+	if carried_amount > 0:
+		_go_to_depot()
+	else:
+		_travel_factory_stage("pickup")
+
+
+func _travel_factory_stage(next_stage: String) -> void:
+	if not factory_route_active or navigation_grid == null:
+		state = WorkState.IDLE
+		return
+	if not is_instance_valid(factory_mine) or not is_instance_valid(factory_smelter):
+		factory_route_active = false
+		state = WorkState.IDLE
+		return
+	factory_stage = next_stage
+	var destination: Vector3 = depot_position
+	var radius: float = 3.5
+	var next_state: WorkState = WorkState.TO_FACTORY_DEPOT
+	if next_stage == "pickup":
+		destination = factory_mine.global_position
+		radius = factory_mine.get_access_radius() + 0.5
+		next_state = WorkState.TO_FACTORY_PICKUP
+	elif next_stage == "input":
+		destination = factory_smelter.global_position
+		radius = factory_smelter.get_access_radius() + 0.5
+		next_state = WorkState.TO_FACTORY_INPUT
+	var route: Array[Vector3] = navigation_grid.find_access_path(global_position, destination, radius)
+	if route.is_empty():
+		state = WorkState.IDLE
+		return
+	waypoints = route
+	next_waypoint = 0
+	state = next_state
+
+
+func _process_factory_wait(delta: float) -> void:
+	if not factory_route_active:
+		state = WorkState.IDLE
+		return
+	if not is_instance_valid(factory_mine) or not is_instance_valid(factory_smelter):
+		factory_route_active = false
+		state = WorkState.IDLE
+		return
+	factory_wait_elapsed += delta
+	if factory_wait_elapsed < 0.4:
+		return
+	factory_wait_elapsed = 0.0
+
+	if state == WorkState.WAIT_FACTORY_PICKUP:
+		var ore: int = factory_mine.withdraw(25 - carried_amount)
+		if ore > 0:
+			carried_type = "iron_ore"
+			carried_amount += ore
+		if carried_amount >= 12 or (carried_amount > 0 and not factory_mine.has_ore()):
+			_travel_factory_stage("input")
+	elif state == WorkState.WAIT_FACTORY_OUTPUT:
+		if carried_type == "iron_ore" and carried_amount > 0:
+			var accepted: int = factory_smelter.deposit_ore(carried_amount)
+			carried_amount -= accepted
+			if carried_amount == 0:
+				carried_type = ""
+			else:
+				# Bufor odbiorczy pelny: czekamy przy hucie.
+				return
+		var metal: int = factory_smelter.collect_metal(25)
+		if metal > 0:
+			carried_type = "metal"
+			carried_amount = metal
+			_travel_factory_stage("depot")
+		elif factory_smelter.ore_stock < 2 and factory_mine.stock > 0:
+			_travel_factory_stage("pickup")
+		elif factory_smelter.ore_stock == 0 and factory_mine.stock == 0 and not factory_mine.has_ore():
+			state = WorkState.IDLE
 
 
 func _begin_recharge() -> bool:
@@ -212,6 +313,9 @@ func _navigate_to_charger() -> bool:
 func _resume_after_charging() -> void:
 	var next: WorkState = suspended_state
 	suspended_state = WorkState.IDLE
+	if factory_route_active:
+		_travel_factory_stage(factory_stage)
+		return
 	if next == WorkState.TO_DEPOT:
 		_go_to_depot()
 	elif next == WorkState.TO_RESOURCE or next == WorkState.GATHERING:
@@ -299,6 +403,21 @@ func _start_route(target: Vector3, next_state: WorkState) -> void:
 
 
 func _finish_route() -> void:
+	if state == WorkState.TO_FACTORY_PICKUP:
+		factory_wait_elapsed = 0.0
+		state = WorkState.WAIT_FACTORY_PICKUP
+		return
+	if state == WorkState.TO_FACTORY_INPUT:
+		factory_wait_elapsed = 0.0
+		state = WorkState.WAIT_FACTORY_OUTPUT
+		return
+	if state == WorkState.TO_FACTORY_DEPOT:
+		if carried_amount > 0 and carried_type == "metal":
+			resource_delivered.emit("metal", carried_amount)
+			carried_amount = 0
+			carried_type = ""
+		_travel_factory_stage("pickup")
+		return
 	if state == WorkState.TO_RESOURCE:
 		if _resource_available():
 			harvest_elapsed = 0.0
@@ -310,7 +429,9 @@ func _finish_route() -> void:
 			resource_delivered.emit(carried_type, carried_amount)
 			carried_amount = 0
 			carried_type = ""
-		if preferred_resource_type != "":
+		if factory_route_active:
+			_travel_factory_stage("pickup")
+		elif preferred_resource_type != "":
 			_go_to_resource()
 		else:
 			state = WorkState.IDLE
@@ -392,4 +513,14 @@ func status_text() -> String:
 			return "Jedzie naprawiac"
 		WorkState.REPAIRING:
 			return "Naprawa"
+		WorkState.TO_FACTORY_PICKUP:
+			return "Do kopalni"
+		WorkState.WAIT_FACTORY_PICKUP:
+			return "Zaladunek rudy"
+		WorkState.TO_FACTORY_INPUT:
+			return "Dostawa do huty"
+		WorkState.WAIT_FACTORY_OUTPUT:
+			return "Odbior metalu"
+		WorkState.TO_FACTORY_DEPOT:
+			return "Metal do magazynu"
 	return "Oczekiwanie"
