@@ -1,26 +1,28 @@
 # WOW — prototyp strategii czasu rzeczywistego
 
-Autorski RTS 3D na **Godot 4.x / GDScript**, docelowo dla Windows. Grafika jest tymczasowa, bez zewnętrznych assetów.
+Autorski RTS 3D na **Godot 4.x / GDScript**, docelowo dla Windows. Grafika jest tymczasowa i nie korzysta z zewnętrznych assetów.
 
-## Dostępne funkcje
+## Gotowe funkcje
 
 - Mapa 3D 100 × 100 z kamerą RTS (WASD, krawędzie ekranu, kółko myszy).
-- Trzy jednostki sterowane prawym przyciskiem myszy, zaznaczanie pojedyncze i grupowe.
-- Ruch z wyznaczaniem ścieżek **AStarGrid2D**, omijaniem drzew i złóż.
-- **Drewno, złoto i kamień** — złoża mają ograniczoną pojemność i znikają po wyczerpaniu.
-- Praca robotników: podejście do surowca, zbieranie, transport maksymalnie **10 jednostek** do magazynu, kolejna wyprawa.
-- Magazyn w centrum mapy oraz licznik zgromadzonych zasobów u góry ekranu.
-- Rozkaz ruchu do innego miejsca przerywa wykonywane zadanie zbierania.
+- Zaznaczanie pojedynczych i wielu jednostek; rozkazy ruchu i zbierania.
+- Pathfinding `AStarGrid2D`: robotnicy omijają drzewa, kopalnie i ratusz.
+- **Drewno, złoto i kamień** — ograniczone złoża, które znikają po wyczerpaniu.
+- Automatyczne zbieranie surowców: robotnik ładuje maksymalnie 10 jednostek i oddaje je do magazynu.
+- Liczniki surowców i populacji robotników.
+- **Ratusz:** stawianie po zebraniu **40 drewna i 20 kamienia**.
+- **Produkcja robotnika:** koszt **10 drewna i 20 złota**, czas szkolenia **4 sekundy**, limit populacji **30**.
+- Na razie można zbudować **jeden** ratusz; budowa odbywa się natychmiast po wskazaniu miejsca.
 
 ## Instalacja / aktualizacja
 
-Pobierz najnowszą wersję kodu:
+Sklonuj repozytorium:
 
 ```bash
 git clone https://github.com/serafin1367/wow.git
 ```
 
-Jeśli masz już klon, zatrzymaj grę i wykonaj w katalogu projektu:
+Jeśli projekt jest już na dysku: zatrzymaj grę i pobierz najnowszy kod z katalogu repozytorium:
 
 ```bash
 git pull origin main
@@ -35,38 +37,43 @@ Otwórz `project.godot` w Godot 4 i naciśnij **F5**.
 | Zaznaczenie jednostki | LPM |
 | Zaznaczenie prostokątem | Przeciągnięcie LPM |
 | Dodanie do zaznaczenia | Shift + LPM / Shift + przeciągnięcie |
-| Ruch | PPM na ziemi |
+| Rozkaz ruchu | PPM na ziemi |
 | Zbieranie | PPM na drzewie, złocie lub kamieniu |
+| **Budowa ratusza** | **B** lub przycisk „Ratusz”, następnie LPM na wolnym terenie |
+| **Produkcja robotnika** | **T** lub przycisk „Robotnik” po wybudowaniu ratusza |
+| Anulowanie trybu budowy | Esc / PPM |
 | Ruch kamery | WASD lub krawędzie ekranu |
 | Przybliżenie / oddalenie | Kółko myszy |
 
-## Test ręczny: ekonomia
+## Test ręczny: budowanie i produkcja (wersja do sprawdzenia w Godocie)
 
-1. Zaznacz jednego z trzech robotników.
-2. Przesuń kamerę w stronę drzew i kliknij **PPM na koronie lub pniu drzewa**.
-3. Robotnik powinien dojść do drzewa, zbierać przez kilka sekund, wrócić do **MAGAZYNU** (na środku mapy), a licznik **Drewno** powinien wzrosnąć o 10.
-4. Wybierz drugiego robotnika i kliknij PPM na **złożu złota**, trzeciego wyślij do **kamieniołomu**.
-5. Zaczekaj, aż wszyscy dostarczą swoje ładunki. Obserwuj trzy liczniki.
-6. Spróbuj zaznaczyć grupę i wysłać ją do jednego drzewa. Gdy wyczerpie się jego zasób, obiekt powinien zniknąć i zwolnić drogę.
-
-**Stan testów:** zmian nie uruchomiono jeszcze w silniku Godot w tym środowisku. W razie błędów prześlij komunikaty z zakładki Debugger.
+1. Wyślij robotnika do drzew oraz drugiego do kamieniołomu. Poczekaj na **40 drewna i 20 kamienia** w magazynie.
+2. Wciśnij **B** lub przycisk ratusza. Kliknij LPM na pustej ziemi, z dala od magazynu, jednostek i złóż.
+3. **Ratusz** powinien pojawić się na mapie. Liczniki drewna i kamienia powinny spaść o koszt budowy.
+4. Zbierz **10 drewna i 20 złota**. Naciśnij **T** lub przycisk „Robotnik”.
+5. Po około **4 sekundach** nowy robotnik powinien pojawić się obok ratusza. Liczba jednostek powinna wzrosnąć z **3 do 4**.
+6. Sprawdź, czy nowy robotnik może poruszać się i zbierać surowce tak jak pozostałe jednostki.
+7. Spróbuj postawić ratusz na kopalni, zbyt blisko magazynu albo bez surowców — mechanizm powinien odrzucić taki rozkaz.
 
 ## Struktura skryptów
 
-- `scripts/main.gd` — mapa, wejście myszą, magazyn, ekonomia i HUD.
-- `scripts/worker.gd` — rozkazy ruchu oraz cykl zbierania/dostarczania.
+- `scripts/main.gd` — mapa, sterowanie, surowce, budowanie, szkolenie, HUD.
+- `scripts/town_hall.gd` — model ratusza i kolizje budynku.
+- `scripts/worker.gd` — ruch i cykl zbierania/dostarczania.
 - `scripts/resource_node.gd` — zasoby z ograniczoną pojemnością.
-- `scripts/navigation_grid.gd` — trasy A* i dynamiczne zwalnianie pól.
+- `scripts/navigation_grid.gd` — trasy A* i zablokowane pola.
 - `scripts/rts_camera.gd` — kamera.
 - `scripts/selection_box.gd` — zaznaczanie wielu jednostek.
 
 ## Ograniczenia
 
-- Nie ma animacji, budowania, produkcji jednostek ani walki.
-- Trasy są wyznaczane na płaskiej siatce; brak lokalnego unikania pozostałych robotników.
-- Nie ma zapisu gry ani automatycznego przydziału nowych złóż po wyczerpaniu starego.
-- Rozkaz ruchu może przerwać transport ładunku; w tej wersji robotnik przechowuje go do kolejnego rozkazu zbierania, kiedy może go odłożyć w magazynie.
+- Nowe mechaniki budowania i szkolenia czekają na **test działania w edytorze Godot**.
+- Budowa ratusza jest natychmiastowa: bez animacji pracujących budowniczych i bez czasu budowy.
+- Jednostki jeszcze nie unikają siebie nawzajem. Nowe jednostki korzystają z wolnego pola blisko ratusza.
+- Brak zapisu gry, walki, animacji oraz automatycznego wybierania kolejnych złóż.
+- Ruch przerywa wykonywanie rozkazu zbierania. Niesiony surowiec zostaje u robotnika, dopóki nie wróci do oddawania materiałów.
+- Nie ma jeszcze przeciwników ani frakcji.
 
-## Następny etap
+## Kolejne etapy
 
-Budowa pierwszego ratusza, produkcja robotników i system kosztów w surowcach.
+Budowanie innych obiektów (np. koszary), produkcja jednostek bojowych, walka i dwie autorskie frakcje.
