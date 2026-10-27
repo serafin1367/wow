@@ -40,6 +40,22 @@ func _change_blocking(center: Vector2, radius: float, change: int) -> void:
 				grid.set_point_solid(cell, count > 0)
 
 
+func is_circle_walkable(center: Vector2, radius: float) -> bool:
+	# Kontrola pod budynki i sadzonki. Nie akceptuj miejsc za granica mapy.
+	var min_x: int = floori(center.x - radius)
+	var max_x: int = ceili(center.x + radius)
+	var min_y: int = floori(center.y - radius)
+	var max_y: int = ceili(center.y + radius)
+	if min_x < MIN_CELL or max_x > MAX_CELL or min_y < MIN_CELL or max_y > MAX_CELL:
+		return false
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			if Vector2(float(x), float(y)).distance_squared_to(center) <= radius * radius:
+				if grid.is_point_solid(Vector2i(x, y)):
+					return false
+	return true
+
+
 func find_free_spawn_near(center: Vector3, camera_position: Vector3, occupied: Array[Vector3]) -> Variant:
 	# Umieszczaj nowe jednostki na stronie ratusza widocznej od kamery.
 	var towards_camera := Vector2(camera_position.x - center.x, camera_position.z - center.z)
