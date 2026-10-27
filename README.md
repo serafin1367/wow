@@ -32,9 +32,33 @@ To jest poczatek systemu energetycznego; nie ma jeszcze kabli sieciowych do dowo
 maszyn, baterii stacjonarnych ani bilansowania wielu odbiorcow. Polaczenie rakiety
 z ladowarka jest w prototypie stale.
 
+### Zaimportowane modele Kenney — WOW 0.4
+
+Do repozytorium dodano **19 oryginalnych modeli GLB** na licencji CC0:
+10 modeli z [Nature Kit](https://kenney.nl/assets/nature-kit)
+i 9 modeli z [Factory Kit 3.0](https://kenney.nl/assets/factory-kit).
+
+- Drzewa i zloza na mapie sa teraz modelami Kenney zamiast prostych bryl.
+- Skrzynie w magazynie korzystaja z Factory Kit; **mechanika dostaw pozostaje bez zmian**.
+- Scena `scenes/asset_showroom.tscn` (F6) pokazuje prawdziwe
+  maszyny, tasmiociag, manipulator, drzewa i kamienie Kenney.
+- Biblioteka plikow: `assets/kenney/nature/`, `assets/kenney/factory/`.
+- Loader: `scripts/kenney_assets.gd`; informacje o licencji i pochodzeniu:
+  `assets/kenney/README.md`.
+
+Modele sa obecne fizycznie w repozytorium. Nie trzeba ich osobno pobierac.
+Przy pierwszym uruchomieniu Godot moze potrzebowac chwili na import plikow GLB.
+
+**Test:** wykonaj `git pull origin main`, poczekaj na import w edytorze
+i uruchom F5. Sprawdz cztery odmiany drzew, zloza zlota i kamienia
+oraz skrzynie magazynowe. Roboty powinny nadal zbierac i dostarczac surowce.
+Potem uruchom F6 dla `scenes/asset_showroom.tscn`.
+
+Nowe pliki nie zostaly przetestowane w uruchomionym Godocie przez asystenta.
+
 ### Przygotowane assety
 
-Wszystkie ponizsze modele sa **oryginalne, proceduralne** (GDScript: BoxMesh,
+Ponizsze *wczesniejsze* modele sa **oryginalne, proceduralne** (GDScript: BoxMesh,
 CylinderMesh i StandardMaterial3D) i naleza do projektu WOW, bez pobierania platnych
 lub cudzych modeli:
 
@@ -42,7 +66,7 @@ lub cudzych modeli:
 - `scripts/charging_pad.gd` — stacja ladowania.
 - `scripts/robot_model.gd` — trzy rozne sylwetki robotow.
 - `scripts/factory_models.gd` — **wiertnica, tasmociag i huta**; na razie tylko modele.
-- `scripts/asset_showroom.gd` — scena wystawowa wszystkich modeli.
+- `scripts/asset_showroom.gd` — scena wystawowa modeli proceduralnych i nowych modeli Kenney.
 - `scripts/town_hall.gd` — futurystyczne centrum dowodzenia (dawny ratusz).
 - `scripts/forester_hut.gd` — technologiczny modul rekultywacji (dawna lesniczowka).
 - `scenes/asset_showroom.tscn` — otworz ja w Godocie i nacisnij **F6**, aby zobaczyc modele.
