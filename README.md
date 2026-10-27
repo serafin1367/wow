@@ -68,6 +68,29 @@ rozstawionymi skrzydlami paneli slonecznych.
 Dla oceny sylwetki uruchom `scenes/asset_showroom.tscn` klawiszem **F6**.
 Nowy model wymaga przetestowania w silniku Godot.
 
+## WOW 0.3 — interfejs kolonii i teren
+
+Na podstawie testu ekranowego zmieniono interfejs z plynacych po mapie etykiet
+na **stale panele RTS**, tworzone przez `scripts/colony_hud.gd`:
+
+- **Gorny pasek:** nazwa kolonii, drewno, zloto, kamien, populacja oraz moc
+  fotowoltaiki i dostepnosc ladowania.
+- **Dolny pasek:** podglad zaznaczonego robota (rola, zadanie, ladunek, akumulator),
+  karta rakiety/ladowarki i przyciski budowy/produkcji/ladowania.
+- Zlikwidowano nachodzace na siebie etykiety 3D oraz blad wyswietlania znakow
+  `\\n` zamiast nowych wierszy.
+- **Klawisze B/T/L/C** i stare sterowanie PPM/LPM pozostaja aktywne.
+- Przygaszono intensywna zielen terenu, dodano mineralne plamy na powierzchni
+  i wyszczegolniono miejsce ladowania rakiety.
+
+**Test UI po aktualizacji:** uruchom F5, wybierz gornika, a potem technika.
+Sprawdz poziom baterii w dolnym panelu, kliknij LPM na rakiete i ladowarke,
+nastepnie z dolnego paska wyslij robota na ladowanie przyciskiem C.
+Zbierz surowce i sprawdz, czy przyciski centrum / rekultywacji nadal dzialaja.
+Przy zaznaczeniu grupowym dolny panel powinien pokazywac liczbe jednostek.
+
+Nowe zmiany nie zostaly jeszcze zweryfikowane w uruchomionym Godocie w srodowisku asystenta.
+
 ## Aktualizacja i test
 
 W folderze sklonowanego repozytorium:
@@ -123,7 +146,7 @@ i sprawdzenia w edytorze Godot na komputerze gracza.
 2. Oddzielic logistyke od wydobywania: robot transportowy zabiera zapas z buforow.
 3. Dodac taśmociagi z automatycznym przesylaniem elementow i hute przetwarzajaca rudy.
 4. Zbudowac siec zasilania (generacja, akumulacja, pobor, ograniczenia mocy).
-5. Rozbudowac UI: karta maszyny, produkcja, kolejki, stan sieci energetycznej.
+5. Rozbudowac obecny HUD o karte maszyny, kolejki produkcji i stan sieci energetycznej.
 
 ## Ograniczenia wersji
 
