@@ -4,6 +4,48 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.8 — polaczenia od maszyny do maszyny, rolety i reczne trasy
+
+Wersja poprawia przede wszystkim **czytelnosc logistyczna** fabryki.
+Kazda tasma posiada teraz dwie stacje przeladunkowe, doprowadzone do
+obrysu kopalni, huty lub magazynu. Znika wizualna przerwa miedzy budynkiem
+i pierwszym/ostatnim segmentem A*.
+
+**Detale graficzne** (autorskie meshe Godot):
+- laczone ramy, prowadnice w pomaranczowym kolorze, rolki, podpory;
+- obrotowe moduly narozy, maskujace szczeliny pod katem 45 i 90 stopni;
+- wskazniki przeplywu, turkusowe czujniki na portach wejscia i wyjscia;
+- paczki rudy i metalu nadal poruszaja sie realnie po pelnej trasie.
+
+**Budowanie tasmy:**
+
+| Wariant | Sterowanie | Efekt |
+|---|---|---|
+| Automatyczna ruda | `J` | A* kopalnia → huta (5 metalu) |
+| Reczna ruda | `Shift+J` | Wyznacz punkty trasy LPM, zatwierdz Enter |
+| Automatyczny metal | `N` | A* huta → magazyn (8 metalu) |
+| Reczny metal | `Shift+N` | Wyznacz punkty trasy LPM, zatwierdz Enter |
+
+Przy trasie recznej mozna wskazac do **12 punktow posrednich** na wolnym
+terenie. Miedzy punktami silnik sam omija przeszkody za pomoca A*.
+Podczas wyboru widoczny jest podglad trasy w turkusowym kolorze.
+**Enter** buduje i pobiera materialy, **Esc/PPM** anuluje bez wydatkow.
+Jesli trasy nie da sie wyznaczyc, budowa nie nastapi i metal pozostaje
+w magazynie. Nadal budujemy jedna tasme na typ polaczenia.
+
+**Kamera:** `Q` i `E` obracaja widok, a `WASD` przesuwaja kamere
+zgodnie z jej aktualnym ustawieniem. Kolko myszy kontroluje przyblizenie.
+
+System produkcji i bilans surowcow z WOW 0.7 nie zostaly zmienione.
+Porty i prowadnice pozostaja obiektami graficznymi bez nowej kolizji,
+aby roboty mogly poruszac sie jak wczesniej.
+
+**Testy:** dotychczasowy `tests/conveyor_smoke.gd` oraz nowy
+`tests/conveyor_manual_smoke.gd` (weryfikuje rolety, naroza, porty,
+brak kosztu podgladu i poprawny koszt po zatwierdzeniu).
+Po aktualizacji warto sprawdzic obie fabryczne tasmy oraz obrocic
+kamere Q/E, aby ocenic efekt z kazdej strony.
+
 ## WOW 0.7 — pierwsze dzialajace tasmociagi
 
 Po zbudowaniu pierwszej fabryki mozna teraz stopniowo zastapic roboty
