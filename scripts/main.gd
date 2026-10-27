@@ -11,6 +11,7 @@ const FORESTER_SCRIPT = preload("res://scripts/forester_hut.gd")
 const LANDER_SCRIPT = preload("res://scripts/colony_lander.gd")
 const CHARGER_SCRIPT = preload("res://scripts/charging_pad.gd")
 const HUD_SCRIPT = preload("res://scripts/colony_hud.gd")
+const KENNEY_ASSETS = preload("res://scripts/kenney_assets.gd")
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
 const FORESTER_COST: Dictionary = {"wood": 30, "stone": 10}
@@ -182,26 +183,33 @@ func _add_tree(parent_node: Node3D, coords: Vector2, sapling: bool = false) -> S
 	parent_node.add_child(tree)
 	tree.add_to_group("resource_nodes")
 
-	var trunk := MeshInstance3D.new()
-	trunk.name = "Trunk"
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = 0.32
-	cylinder.bottom_radius = 0.48
-	cylinder.height = 2.5
-	trunk.mesh = cylinder
-	trunk.position.y = 1.25
-	trunk.material_override = _make_material(Color(0.40, 0.25, 0.12))
-	tree.add_child(trunk)
-
-	var leaves := MeshInstance3D.new()
-	leaves.name = "Crown"
-	var sphere := SphereMesh.new()
-	sphere.radius = 1.7
-	sphere.height = 3.4
-	leaves.mesh = sphere
-	leaves.position.y = 3.35
-	leaves.material_override = _make_material(Color(0.10, 0.37, 0.16))
-	tree.add_child(leaves)
+	# Prawdziwe modele low-poly Kenney Nature Kit (CC0).
+	# Pozostawiamy oryginalne hitboxy i parametry scinania.
+	var variants: Array[String] = ["tree-oak", "tree-default", "tree-cone", "tree-pinedefaulta"]
+	var variant_index: int = posmod(roundi(coords.x * 11.0 + coords.y * 23.0), variants.size())
+	var tree_visual = KENNEY_ASSETS.model("nature", variants[variant_index], 3.8)
+	if tree_visual != null:
+		tree_visual.name = "KenneyTree"
+		tree.add_child(tree_visual)
+	else:
+		# Fallback jesli GLB zostanie usuniety z projektu.
+		var trunk := MeshInstance3D.new()
+		var trunk_mesh := CylinderMesh.new()
+		trunk_mesh.height = 2.5
+		trunk_mesh.top_radius = 0.32
+		trunk_mesh.bottom_radius = 0.48
+		trunk.mesh = trunk_mesh
+		trunk.position.y = 1.25
+		trunk.material_override = _make_material(Color(0.40, 0.25, 0.12))
+		tree.add_child(trunk)
+		var leaves := MeshInstance3D.new()
+		var crown_mesh := SphereMesh.new()
+		crown_mesh.radius = 1.7
+		crown_mesh.height = 3.4
+		leaves.mesh = crown_mesh
+		leaves.position.y = 3.35
+		leaves.material_override = _make_material(Color(0.10, 0.37, 0.16))
+		tree.add_child(leaves)
 
 	var trunk_collision := CollisionShape3D.new()
 	var trunk_shape := CylinderShape3D.new()
@@ -257,19 +265,21 @@ func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 	add_child(deposit)
 	deposit.add_to_group("resource_nodes")
 
+	var rock_variants: Array[String] = ["rock-largea", "rock-largeb", "rock-largec"]
 	for i in range(4):
-		var rock := MeshInstance3D.new()
-		rock.name = "Rock%d" % i
-		var sphere := SphereMesh.new()
-		sphere.radius = 1.0
-		sphere.height = 2.0
-		rock.mesh = sphere
-		var offset_x := float(i % 2) * 2.0 - 1.0
-		var offset_z := float(i / 2) * 2.0 - 1.0
-		rock.position = Vector3(offset_x, 0.9, offset_z)
-		rock.scale = Vector3(1.5, 1.0 + float(i) * 0.15, 1.4)
-		rock.material_override = _make_material(tint)
-		deposit.add_child(rock)
+		var rock = KENNEY_ASSETS.model("nature", rock_variants[i % rock_variants.size()], 3.0 + float(i) * 0.25)
+		if rock != null:
+			rock.position = Vector3(float(i % 2) * 2.0 - 1.0, 0.0, float(i / 2) * 2.0 - 1.0)
+			KENNEY_ASSETS.tint_meshes(rock, tint)
+			deposit.add_child(rock)
+		else:
+			var fallback := MeshInstance3D.new()
+			var mesh := SphereMesh.new()
+			mesh.radius = 0.9
+			fallback.mesh = mesh
+			fallback.position = Vector3(float(i % 2) * 2.0 - 1.0, 0.9, float(i / 2) * 2.0 - 1.0)
+			fallback.material_override = _make_material(tint)
+			deposit.add_child(fallback)
 
 	var obstacle_collision := CollisionShape3D.new()
 	var obstacle_shape := BoxShape3D.new()
@@ -306,14 +316,19 @@ func _create_depot() -> void:
 	depot.add_child(platform)
 
 	for i in range(3):
-		var crate := MeshInstance3D.new()
-		crate.name = "Crate%d" % i
-		var crate_mesh := BoxMesh.new()
-		crate_mesh.size = Vector3(0.95, 1.0 + float(i) * 0.25, 0.95)
-		crate.mesh = crate_mesh
-		crate.position = Vector3(float(i) - 1.0, 0.85, 0.0)
-		crate.material_override = _make_material(Color(0.45, 0.57, 0.61))
-		depot.add_child(crate)
+		var crate_name := "box-large" if i == 1 else "box-small"
+		var crate = KENNEY_ASSETS.model("factory", crate_name, 1.25)
+		if crate != null:
+			crate.position = Vector3(float(i) - 1.0, 0.35, 0.0)
+			depot.add_child(crate)
+		else:
+			var fallback := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(0.9, 1.0, 0.9)
+			fallback.mesh = box
+			fallback.position = Vector3(float(i) - 1.0, 0.85, 0.0)
+			fallback.material_override = _make_material(Color(0.45, 0.57, 0.61))
+			depot.add_child(fallback)
 
 	var depot_name := Label3D.new()
 	depot_name.text = "MAGAZYN KOLONII"
