@@ -40,23 +40,64 @@ func _change_blocking(center: Vector2, radius: float, change: int) -> void:
 				grid.set_point_solid(cell, count > 0)
 
 
-func find_free_spawn_near(center: Vector3, sequence: int = 0) -> Vector3:
-	# Kandydaci sa poza promieniem blokowania ratusza (4.5 pola).
-	for radius in range(5, 12):
-		for i in range(16):
-			var angle := TAU * float((i + sequence * 3) % 16) / 16.0
-			var position := Vector3(
-				center.x + cos(angle) * float(radius),
+func find_free_spawn_near(center: Vector3, camera_position: Vector3, occupied: Array[Vector3]) -> Variant:
+	# Umieszczaj nowe jednostki na stronie ratusza widocznej od kamery.
+	var towards_camera := Vector2(camera_position.x - center.x, camera_position.z - center.z)
+	if towards_camera.length_squared() < 0.001:
+		towards_camera = Vector2(0.0, 1.0)
+	var base_angle := towards_camera.angle()
+	var angle_offsets: Array[float] = [
+		0.0, 0.30, -0.30, 0.60, -0.60, 0.90, -0.90,
+		1.20, -1.20, 1.48, -1.48, 1.80, -1.80, PI
+	]
+	for radius in [6.0, 7.5, 9.0, 10.5, 12.0]:
+		for offset in angle_offsets:
+			var angle: float = base_angle + offset
+			var candidate := Vector3(
+				center.x + cos(angle) * radius,
 				0.0,
-				center.z + sin(angle) * float(radius)
+				center.z + sin(angle) * radius
 			)
-			var cell := _world_to_cell(position)
-			if abs(cell.x) > 47 or abs(cell.y) > 47:
+			var cell := _world_to_cell(candidate)
+			if abs(cell.x) >= 48 or abs(cell.y) >= 48:
 				continue
-			if not grid.is_point_solid(cell):
+			if grid.is_point_solid(cell):
+				continue
+			var free_space: bool = true
+			for unit_position in occupied:
+				if Vector2(float(cell.x), float(cell.y)).distance_to(Vector2(unit_position.x, unit_position.z)) < 1.6:
+					free_space = false
+					break
+			if free_space:
 				return Vector3(float(cell.x), 0.0, float(cell.y))
-	return Vector3(0.0, 0.0, 0.0)
+	return null
 
+
+func find_access_path(origin: Vector3, center: Vector3, clearance_radius: float) -> Array[Vector3]:
+	# Magazyn jest fizyczna przeszkoda, dlatego dostawa konczy sie PRZED budynkiem.
+	# Wybieramy najkrotsza dostepna trase do jednego z punktow wokol niego.
+	var best: Array[Vector3] = []
+	var shortest: float = INF
+	for radius_offset in [0.0, 0.8, 1.6]:
+		var distance: float = clearance_radius + radius_offset
+		for i in range(16):
+			var angle := TAU * float(i) / 16.0
+			var desired := Vector3(center.x + cos(angle) * distance, 0.0, center.z + sin(angle) * distance)
+			var cell := _world_to_cell(desired)
+			if grid.is_point_solid(cell):
+				continue
+			var path: Array[Vector3] = find_path(origin, Vector3(float(cell.x), 0.0, float(cell.y)))
+			if path.is_empty():
+				continue
+			var score: float = 0.0
+			for step in range(1, path.size()):
+				score += path[step - 1].distance_to(path[step])
+			# Wybor blizszego budynkowi pola rozstrzyga remisy.
+			score += radius_offset * 0.1
+			if score < shortest:
+				shortest = score
+				best = path
+	return best
 
 func find_path(origin: Vector3, target: Vector3) -> Array[Vector3]:
 	var from_id := _world_to_cell(origin)
