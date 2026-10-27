@@ -257,7 +257,7 @@ func _create_depot() -> void:
 	platform_mesh.size = Vector3(4.0, 0.35, 4.0)
 	platform.mesh = platform_mesh
 	platform.position.y = 0.18
-	platform.material_override = _make_material(Color(0.43, 0.34, 0.20))
+	platform.material_override = _make_material(Color(0.26, 0.35, 0.41))
 	depot.add_child(platform)
 
 	for i in range(3):
@@ -267,11 +267,11 @@ func _create_depot() -> void:
 		crate_mesh.size = Vector3(0.95, 1.0 + float(i) * 0.25, 0.95)
 		crate.mesh = crate_mesh
 		crate.position = Vector3(float(i) - 1.0, 0.85, 0.0)
-		crate.material_override = _make_material(Color(0.52, 0.33, 0.17))
+		crate.material_override = _make_material(Color(0.45, 0.57, 0.61))
 		depot.add_child(crate)
 
 	var depot_name := Label3D.new()
-	depot_name.text = "MAGAZYN"
+	depot_name.text = "MAGAZYN KOLONII"
 	depot_name.position.y = 2.6
 	depot_name.font_size = 40
 	depot_name.pixel_size = 0.008
@@ -407,7 +407,7 @@ func _create_hud() -> void:
 	ui.add_child(actions)
 
 	build_button = Button.new()
-	build_button.text = "Ratusz (B): 40 drewna + 20 kamienia"
+	build_button.text = "Centrum (B): 40 drewna + 20 kamienia"
 	build_button.pressed.connect(_toggle_build_mode)
 	actions.add_child(build_button)
 
@@ -417,7 +417,7 @@ func _create_hud() -> void:
 	actions.add_child(train_button)
 
 	forester_button = Button.new()
-	forester_button.text = "Lesniczowka (L): 30 drewna + 10 kamienia"
+	forester_button.text = "Rekultywacja (L): 30 drewna + 10 kamienia"
 	forester_button.pressed.connect(_toggle_forester_mode)
 	actions.add_child(forester_button)
 
@@ -557,9 +557,9 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 
 	var building_hit := _raycast(screen_position, 8)
 	if building_hit.has("collider") and building_hit["collider"] == town_hall:
-		_set_status("Ratusz: nacisnij T lub przycisk Robotnik, aby rozpoczac szkolenie.")
+		_set_status("Centrum: nacisnij T lub Robotnik, aby szkolic kolejnego gornika.")
 	elif building_hit.has("collider") and building_hit["collider"] in foresters:
-		_set_status("Lesniczowka automatycznie sadzi drzewa w poblizu.")
+		_set_status("Modul rekultywacji automatycznie sadzi drzewa w poblizu.")
 
 
 func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
@@ -660,17 +660,17 @@ func _toggle_build_mode() -> void:
 	if forester_build_mode:
 		forester_build_mode = false
 	if town_hall != null:
-		_set_status("Ratusz juz istnieje. Mozesz produkowac robotnikow.")
+		_set_status("Centrum dowodzenia juz istnieje. Mozesz produkowac roboty.")
 		return
 	if build_mode:
 		build_mode = false
 		_set_status("Anulowano budowe.")
 		return
 	if not _can_afford(TOWN_HALL_COST):
-		_set_status("Brakuje surowcow: ratusz wymaga 40 drewna i 20 kamienia.")
+		_set_status("Brakuje surowcow: centrum wymaga 40 drewna i 20 kamienia.")
 		return
 	build_mode = true
-	_set_status("Wybierz LPM wolne miejsce na ratusz; PPM lub Esc anuluje.")
+	_set_status("Wybierz LPM miejsce na centrum; PPM lub Esc anuluje.")
 
 
 func _try_place_town_hall(screen_position: Vector2) -> void:
@@ -693,7 +693,7 @@ func _try_place_town_hall(screen_position: Vector2) -> void:
 	add_child(town_hall)
 	navigation.block_circle(Vector2(site.x, site.z), TOWN_HALL_RADIUS)
 	build_mode = false
-	_set_status("Ratusz zbudowany! Mozesz szkolic nowych robotnikow (T).")
+	_set_status("Centrum gotowe! Mozesz produkowac roboty gornicze (T).")
 	_update_action_buttons()
 
 
