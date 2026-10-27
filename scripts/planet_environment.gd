@@ -116,7 +116,10 @@ func crystal_color() -> Color:
 
 func apply_resource_colors(resources: Array) -> void:
     for deposit in resources:
-        if not is_instance_valid(deposit) or deposit.resource_type == "wood":
+        if not is_instance_valid(deposit):
+            continue
+        if deposit.resource_type == "wood":
+            _apply_vegetation_accents(deposit)
             continue
         for child in deposit.get_children():
             if child.name.begins_with("OreRock_"):
@@ -124,6 +127,38 @@ func apply_resource_colors(resources: Array) -> void:
                 KENNEY.tint_meshes(child, rock_color(deposit.resource_type, digits))
             elif child.name.begins_with("Vein_"):
                 _recolor_meshes(child, Color(0.98, 0.70, 0.24) if deposit.resource_type == "gold" else _palette(current_planet)["glow"])
+
+
+func _apply_vegetation_accents(tree: Node3D) -> void:
+    # Niewielkie, kontrastowe pigmenty lisci dodaja unikatowego charakteru.
+    # Mars: turkusowa roslinnosc terraformacyjna, Ziemia: zielona,
+    # Kepler: niebiesko-fioletowa. Bez nowych kolizji.
+    var leaf_tint: Color = Color(0.23, 0.78, 0.36)
+    if current_planet == "Mars":
+        leaf_tint = Color(0.18, 0.65, 0.66)
+    elif current_planet == "Kepler":
+        leaf_tint = Color(0.57, 0.51, 0.88)
+    var accents: Node3D = tree.get_node_or_null("FoliageAccents")
+    if accents == null:
+        accents = Node3D.new()
+        accents.name = "FoliageAccents"
+        tree.add_child(accents)
+        for index in range(4):
+            var mesh_instance := MeshInstance3D.new()
+            mesh_instance.name = "LeafPigment_%d" % index
+            var bloom := SphereMesh.new()
+            bloom.radius = 0.39
+            bloom.height = 0.68
+            bloom.radial_segments = 7
+            bloom.rings = 4
+            mesh_instance.mesh = bloom
+            mesh_instance.position = Vector3(
+                (float(index % 2) - 0.5) * 1.75,
+                2.8 + float(index) * 0.29,
+                (float(index / 2) - 0.5) * 1.1
+            )
+            accents.add_child(mesh_instance)
+    _recolor_meshes(accents, leaf_tint)
 
 
 func _recolor_meshes(root: Node, color: Color) -> void:
