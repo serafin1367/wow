@@ -63,17 +63,17 @@ func _create_environment() -> void:
 	world.name = "WorldEnvironment"
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.58, 0.78, 0.92)
+	environment.background_color = Color(0.27, 0.39, 0.48)
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.78, 0.84, 0.95)
-	environment.ambient_light_energy = 0.8
+	environment.ambient_light_color = Color(0.64, 0.75, 0.82)
+	environment.ambient_light_energy = 0.65
 	world.environment = environment
 	add_child(world)
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.rotation_degrees = Vector3(-50.0, -25.0, 0.0)
-	sun.light_energy = 1.2
+	sun.light_energy = 1.05
 	sun.shadow_enabled = true
 	add_child(sun)
 
@@ -90,7 +90,7 @@ func _create_ground() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(MAP_SIZE, MAP_SIZE)
 	visual.mesh = plane
-	visual.material_override = _make_material(Color(0.26, 0.50, 0.23))
+	visual.material_override = _make_material(Color(0.22, 0.34, 0.30))
 	ground.add_child(visual)
 
 	var shape := BoxShape3D.new()
@@ -99,6 +99,55 @@ func _create_ground() -> void:
 	collision.shape = shape
 	collision.position.y = -0.1
 	ground.add_child(collision)
+
+	# Niewielka nieregularnosc powierzchni: mineralne plamy widoczne z gory.
+	# Elementy sa plaskie, nie zmieniaja siatki ruchu robotow.
+	var dust_colors: Array[Color] = [
+		Color(0.24, 0.31, 0.29),
+		Color(0.27, 0.37, 0.32),
+		Color(0.18, 0.29, 0.28)
+	]
+	for i in range(36):
+		var angle: float = float(i) * 2.39996
+		var distance: float = 8.0 + float((i * 17) % 40)
+		var place := Vector3(cos(angle) * distance, 0.014, sin(angle) * distance)
+		var patch := MeshInstance3D.new()
+		patch.name = "MineralPatch%d" % i
+		var surface := CylinderMesh.new()
+		surface.top_radius = 1.2 + float(i % 5) * 0.48
+		surface.bottom_radius = surface.top_radius
+		surface.height = 0.015
+		surface.radial_segments = 10
+		patch.mesh = surface
+		patch.position = place
+		patch.scale.z = 0.6 + float(i % 4) * 0.24
+		patch.material_override = _make_material(dust_colors[i % dust_colors.size()])
+		add_child(patch)
+
+	# Strefa ladowania rakiety, z przemyslowym obramowaniem.
+	var pad := MeshInstance3D.new()
+	pad.name = "LandingZone"
+	var pad_mesh := CylinderMesh.new()
+	pad_mesh.top_radius = 8.2
+	pad_mesh.bottom_radius = 8.2
+	pad_mesh.height = 0.07
+	pad_mesh.radial_segments = 12
+	pad.mesh = pad_mesh
+	pad.position = Vector3(LANDER_POSITION.x, 0.035, LANDER_POSITION.z)
+	pad.material_override = _make_material(Color(0.18, 0.24, 0.27))
+	add_child(pad)
+
+	var core := MeshInstance3D.new()
+	core.name = "LandingMarking"
+	var core_mesh := CylinderMesh.new()
+	core_mesh.top_radius = 7.45
+	core_mesh.bottom_radius = 7.45
+	core_mesh.height = 0.015
+	core_mesh.radial_segments = 12
+	core.mesh = core_mesh
+	core.position = Vector3(LANDER_POSITION.x, 0.079, LANDER_POSITION.z)
+	core.material_override = _make_material(Color(0.26, 0.36, 0.37))
+	add_child(core)
 
 
 func _create_resources() -> void:
