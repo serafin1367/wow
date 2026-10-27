@@ -16,6 +16,7 @@ const PLANET_SCRIPT = preload("res://scripts/planet_environment.gd")
 const DEPOT_VISUAL_SCRIPT = preload("res://scripts/depot_model.gd")
 const MINE_SCRIPT = preload("res://scripts/automated_mine.gd")
 const SMELTER_SCRIPT = preload("res://scripts/automated_smelter.gd")
+const CONVEYOR_SCRIPT = preload("res://scripts/conveyor_link.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
@@ -31,6 +32,8 @@ const IRON_DEPOSIT_POSITION: Vector3 = Vector3(18.0, 0.0, 8.0)
 const MINE_COST: Dictionary = {"wood": 20, "stone": 10}
 const SMELTER_COST: Dictionary = {"wood": 30, "stone": 20}
 const SMELTER_RADIUS: float = 3.9
+const ORE_CONVEYOR_COST: Dictionary = {"metal": 5}
+const METAL_CONVEYOR_COST: Dictionary = {"metal": 8}
 const MAX_WORKERS: int = 30
 const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
@@ -61,6 +64,8 @@ var factory_smelter = null
 var mine_build_mode: bool = false
 var smelter_build_mode: bool = false
 var unused_power_kw: float = 0.0
+var ore_conveyor = null
+var metal_conveyor = null
 
 
 func _ready() -> void:
@@ -508,9 +513,14 @@ func _update_factory_power() -> void:
 		if factory_mine.power_enabled:
 			power -= factory_mine.POWER_KW
 	if factory_smelter != null:
-		factory_smelter.power_enabled = power >= factory_smelter.POWER_KW
+		factory_smelter.power_enabled = power + 0.001 >= factory_smelter.POWER_KW
 		if factory_smelter.power_enabled:
 			power -= factory_smelter.POWER_KW
+	for belt in [ore_conveyor, metal_conveyor]:
+		if belt != null:
+			belt.powered = power + 0.001 >= belt.POWER_KW
+			if belt.powered:
+				power -= belt.POWER_KW
 	unused_power_kw = maxf(0.0, power)
 
 
@@ -534,6 +544,81 @@ func _assign_factory_haulers(robots: Array) -> void:
 			robot.command_factory_route(factory_mine, factory_smelter, navigation, DEPOT_POSITION)
 			assigned += 1
 	_set_status("Transport przydzielony: %d robot(ow). PPM na ziemi przerywa zadanie." % assigned)
+
+
+func _build_ore_conveyor() -> void:
+	_build_conveyor("ore")
+
+
+func _build_metal_conveyor() -> void:
+	_build_conveyor("metal")
+
+
+func _build_conveyor(kind: String) -> void:
+	if factory_mine == null or factory_smelter == null:
+		_set_status("Najpierw zbuduj kopalnie (M) i hute (H).")
+		return
+	if kind == "ore" and ore_conveyor != null:
+		_set_status("Tasmociag rudy juz jest polaczony.")
+		return
+	if kind == "metal" and metal_conveyor != null:
+		_set_status("Tasmociag metalu juz jest polaczony.")
+		return
+
+	var cost: Dictionary = ORE_CONVEYOR_COST if kind == "ore" else METAL_CONVEYOR_COST
+	if not _can_afford(cost):
+		_set_status("Potrzeba %d metalu z huty, aby zbudowac tasme." % int(cost["metal"]))
+		return
+
+	var source_position: Vector3 = factory_mine.global_position if kind == "ore" else factory_smelter.global_position
+	var target_position: Vector3 = factory_smelter.global_position if kind == "ore" else DEPOT_POSITION
+	var source_radius: float = factory_mine.get_access_radius() if kind == "ore" else factory_smelter.get_access_radius()
+	var dest_radius: float = factory_smelter.get_access_radius() if kind == "ore" else DEPOT_BLOCK_RADIUS
+
+	# Prowadzimy tasme po bezpiecznych polach A* (bez zmiany kolizji ruchu robotow).
+	# Poczatkiem jest dostepny punkt wokol budynku, nie jego zablokowany srodek.
+	var near_source: Array[Vector3] = navigation.find_access_path(
+		target_position, source_position, source_radius + 0.9
+	)
+	if near_source.is_empty():
+		_set_status("Brak dostepnego podejscia do wyjscia budynku.")
+		return
+	var start: Vector3 = near_source[near_source.size() - 1]
+	var route: Array[Vector3] = navigation.find_access_path(start, target_position, dest_radius + 0.9)
+	if route.size() < 2:
+		_set_status("Nie mozna poprowadzic tasmy. Postaw budynki w dostepnej okolicy.")
+		return
+	if route.size() > 95:
+		_set_status("Ta wersja obsluguje tasmociagi do 95 segmentow.")
+		return
+	if not _spend_resources(cost):
+		return
+
+	var link = CONVEYOR_SCRIPT.new()
+	link.setup(kind, factory_mine if kind == "ore" else factory_smelter,
+		factory_smelter if kind == "ore" else get_node("Depot"), route)
+	add_child(link)
+	if kind == "ore":
+		ore_conveyor = link
+	else:
+		metal_conveyor = link
+		link.cargo_delivered.connect(_on_conveyor_delivered)
+	_update_factory_power()
+	_sync_factory_haulers()
+	_update_action_buttons()
+	_set_status("Podlaczono %s. Obserwuj przesuwajace sie paczki i prace robotow." % (
+		"ru­de z kopalni do huty" if kind == "ore" else "metal z huty do magazynu"
+	))
+
+
+func _on_conveyor_delivered(resource_type: String, amount: int) -> void:
+	_on_resource_delivered(resource_type, amount)
+
+
+func _sync_factory_haulers() -> void:
+	for robot in workers:
+		if robot.robot_role == "hauler":
+			robot.set_factory_belts(ore_conveyor != null, metal_conveyor != null)
 
 
 func _on_resource_depleted(resource, clearance_radius: float) -> void:
@@ -615,6 +700,8 @@ func _create_hud() -> void:
 	hud.charge_requested.connect(_charge_selected)
 	hud.mine_requested.connect(_toggle_mine_mode)
 	hud.smelter_requested.connect(_toggle_smelter_mode)
+	hud.ore_conveyor_requested.connect(_build_ore_conveyor)
+	hud.metal_conveyor_requested.connect(_build_metal_conveyor)
 	hud.planet_change_requested.connect(_cycle_planet)
 	add_child(hud)
 
@@ -659,9 +746,9 @@ func _update_colony_hud() -> void:
 		elif selected_structure in foresters:
 			hud.set_structure("MODUL REKULTYWACJI", "Odnawianie drzew: cykl 8 sekund.")
 		elif selected_structure == factory_mine:
-			hud.set_structure("KOPALNIA ZELAZA", factory_mine.describe())
+			hud.set_structure("KOPALNIA ZELAZA", factory_mine.describe() + (" | TASMA RUDA" if ore_conveyor != null else ""))
 		elif selected_structure == factory_smelter:
-			hud.set_structure("HUTA METALU", factory_smelter.describe())
+			hud.set_structure("HUTA METALU", factory_smelter.describe() + (" | TASMA METAL" if metal_conveyor != null else ""))
 		else:
 			hud.set_no_selection()
 	else:
@@ -699,6 +786,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_H:
 			_toggle_smelter_mode()
+			return
+		if event.keycode == KEY_J:
+			_build_ore_conveyor()
+			return
+		if event.keycode == KEY_N:
+			_build_metal_conveyor()
 			return
 		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode):
 			_cancel_build_modes()
@@ -1154,6 +1247,7 @@ func _update_action_buttons() -> void:
 			not selected_workers.is_empty()
 		)
 		hud.set_factory_availability(factory_mine != null, factory_smelter != null)
+		hud.set_conveyor_availability(ore_conveyor != null, metal_conveyor != null, factory_mine != null and factory_smelter != null)
 
 
 func _on_resource_delivered(resource_type: String, amount: int) -> void:
