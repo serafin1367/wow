@@ -10,6 +10,7 @@ const TOWN_HALL_SCRIPT = preload("res://scripts/town_hall.gd")
 const TOWN_HALL_COST: Dictionary = {"wood": 40, "stone": 20}
 const WORKER_COST: Dictionary = {"wood": 10, "gold": 20}
 const TOWN_HALL_RADIUS: float = 4.5
+const DEPOT_BLOCK_RADIUS: float = 3.2
 const MAX_WORKERS: int = 30
 const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
@@ -106,7 +107,7 @@ func _create_resources() -> void:
 func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
 	var tree = RESOURCE_SCRIPT.new()
 	tree.resource_type = "wood"
-	tree.remaining = 60
+	tree.remaining = 200
 	tree.clearance_radius = 1.6
 	tree.depleted.connect(_on_resource_depleted)
 	tree.collision_layer = 4
@@ -158,7 +159,7 @@ func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
 func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 	var deposit = RESOURCE_SCRIPT.new()
 	deposit.resource_type = "gold" if deposit_name == "GoldMine" else "stone"
-	deposit.remaining = 300
+	deposit.remaining = 3000 if deposit.resource_type == "gold" else 2000
 	deposit.clearance_radius = 3.6
 	deposit.depleted.connect(_on_resource_depleted)
 	deposit.collision_layer = 4
@@ -192,10 +193,20 @@ func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 
 
 func _create_depot() -> void:
-	var depot := Node3D.new()
+	var depot := StaticBody3D.new()
 	depot.name = "Stockpile"
 	depot.position = DEPOT_POSITION
+	depot.collision_layer = 4
+	depot.collision_mask = 0
 	add_child(depot)
+
+	var storage_collision := CollisionShape3D.new()
+	var storage_shape := BoxShape3D.new()
+	storage_shape.size = Vector3(4.0, 2.8, 4.0)
+	storage_collision.shape = storage_shape
+	storage_collision.position.y = 1.4
+	depot.add_child(storage_collision)
+	navigation.block_circle(Vector2(DEPOT_POSITION.x, DEPOT_POSITION.z), DEPOT_BLOCK_RADIUS)
 
 	var platform := MeshInstance3D.new()
 	platform.name = "StoragePlatform"
@@ -240,13 +251,28 @@ func _create_workers() -> void:
 		_spawn_worker(start)
 
 
-func _spawn_worker(at_position: Vector3) -> void:
+func _spawn_worker(at_position: Vector3) -> CharacterBody3D:
 	var worker = WORKER_SCRIPT.new()
 	worker.name = "Worker%d" % (workers.size() + 1)
 	worker.position = at_position
 	add_child(worker)
 	worker.resource_delivered.connect(_on_resource_delivered)
 	workers.append(worker)
+	return worker
+
+
+func _announce_new_worker(worker: CharacterBody3D) -> void:
+	var marker := Label3D.new()
+	marker.text = "NOWY ROBOTNIK"
+	marker.position.y = 2.5
+	marker.font_size = 55
+	marker.pixel_size = 0.007
+	marker.modulate = Color(1.0, 0.95, 0.25)
+	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	worker.add_child(marker)
+	var anim := create_tween()
+	anim.tween_property(marker, "position:y", 4.0, 2.8)
+	anim.tween_callback(marker.queue_free)
 
 
 func _create_camera() -> void:
@@ -531,10 +557,23 @@ func _train_worker() -> void:
 
 func _finish_training() -> void:
 	training_in_progress = false
-	var spawn_position: Vector3 = navigation.find_free_spawn_near(town_hall.global_position, workers.size())
-	_spawn_worker(spawn_position)
+	var camera := get_viewport().get_camera_3d()
+	var camera_position: Vector3 = town_hall.global_position + Vector3(0.0, 20.0, 20.0)
+	if camera != null:
+		camera_position = camera.global_position
+	var occupied: Array[Vector3] = []
+	for existing_worker in workers:
+		occupied.append(existing_worker.global_position)
+	var spawn_position = navigation.find_free_spawn_near(town_hall.global_position, camera_position, occupied)
+	if spawn_position == null:
+		_refund_resources(WORKER_COST)
+		_set_status("Brak wolnego miejsca na robotnika. Zasoby zwrocone.")
+		_update_action_buttons()
+		return
+	var worker = _spawn_worker(spawn_position)
+	_announce_new_worker(worker)
 	_update_resource_hud()
-	_set_status("Nowy robotnik jest gotowy! Liczba robotnikow: %d." % workers.size())
+	_set_status("Nowy robotnik gotowy przed ratuszem. Liczba robotnikow: %d." % workers.size())
 	_update_action_buttons()
 
 
@@ -552,6 +591,12 @@ func _spend_resources(cost: Dictionary) -> bool:
 		resource_totals[resource_type] = int(resource_totals[resource_type]) - int(cost[resource_type])
 	_update_resource_hud()
 	return true
+
+
+func _refund_resources(cost: Dictionary) -> void:
+	for resource_type in cost.keys():
+		resource_totals[resource_type] = int(resource_totals[resource_type]) + int(cost[resource_type])
+	_update_resource_hud()
 
 
 func _set_status(message: String) -> void:
