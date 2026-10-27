@@ -7,6 +7,7 @@ const MAX_CELL: int = 49
 const MAX_SEARCH_RADIUS: int = 12
 
 var grid: AStarGrid2D
+var obstacle_counts: Dictionary = {}
 
 
 func _init() -> void:
@@ -19,10 +20,24 @@ func _init() -> void:
 
 
 func block_circle(center: Vector2, radius: float) -> void:
+	_change_blocking(center, radius, 1)
+
+
+func unblock_circle(center: Vector2, radius: float) -> void:
+	_change_blocking(center, radius, -1)
+
+
+func _change_blocking(center: Vector2, radius: float, change: int) -> void:
 	for x in range(maxi(MIN_CELL, floori(center.x - radius)), mini(MAX_CELL, ceili(center.x + radius)) + 1):
 		for z in range(maxi(MIN_CELL, floori(center.y - radius)), mini(MAX_CELL, ceili(center.y + radius)) + 1):
 			if Vector2(float(x), float(z)).distance_squared_to(center) <= radius * radius:
-				grid.set_point_solid(Vector2i(x, z))
+				var cell := Vector2i(x, z)
+				var count: int = maxi(0, int(obstacle_counts.get(cell, 0)) + change)
+				if count == 0:
+					obstacle_counts.erase(cell)
+				else:
+					obstacle_counts[cell] = count
+				grid.set_point_solid(cell, count > 0)
 
 
 func find_path(origin: Vector3, target: Vector3) -> Array[Vector3]:
