@@ -14,6 +14,8 @@ const HUD_SCRIPT = preload("res://scripts/colony_hud.gd")
 const KENNEY_ASSETS = preload("res://scripts/kenney_assets.gd")
 const PLANET_SCRIPT = preload("res://scripts/planet_environment.gd")
 const DEPOT_VISUAL_SCRIPT = preload("res://scripts/depot_model.gd")
+const MINE_SCRIPT = preload("res://scripts/automated_mine.gd")
+const SMELTER_SCRIPT = preload("res://scripts/automated_smelter.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
@@ -25,6 +27,10 @@ const TOWN_HALL_COST: Dictionary = {"wood": 40, "stone": 20}
 const WORKER_COST: Dictionary = {"wood": 10, "gold": 20}
 const TOWN_HALL_RADIUS: float = 4.5
 const DEPOT_BLOCK_RADIUS: float = 3.2
+const IRON_DEPOSIT_POSITION: Vector3 = Vector3(18.0, 0.0, 8.0)
+const MINE_COST: Dictionary = {"wood": 20, "stone": 10}
+const SMELTER_COST: Dictionary = {"wood": 30, "stone": 20}
+const SMELTER_RADIUS: float = 3.9
 const MAX_WORKERS: int = 30
 const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
@@ -36,7 +42,8 @@ var selection_box: Control
 var mouse_down: bool = false
 var is_dragging: bool = false
 var drag_start: Vector2 = Vector2.ZERO
-var resource_totals: Dictionary = {"wood": 0, "gold": 0, "stone": 0}
+# Paczka startowa statku: materiały wystarczą na pierwszy ekstraktor i hute.
+var resource_totals: Dictionary = {"wood": 90, "gold": 0, "stone": 60, "metal": 0}
 var forester_build_mode: bool = false
 var foresters: Array = []
 var build_mode: bool = false
@@ -49,6 +56,11 @@ var hud_elapsed: float = 0.0
 var hud = null
 var selected_structure = null
 var planet_env = null
+var factory_mine = null
+var factory_smelter = null
+var mine_build_mode: bool = false
+var smelter_build_mode: bool = false
+var unused_power_kw: float = 0.0
 
 
 func _ready() -> void:
@@ -150,6 +162,7 @@ func _create_resources() -> void:
 
 	_add_deposit("GoldMine", Vector3(-25.0, 0.0, 9.0), Color(0.9, 0.67, 0.12))
 	_add_deposit("StoneQuarry", Vector3(29.0, 0.0, 18.0), Color(0.48, 0.50, 0.53))
+	_add_deposit("IronOreDeposit", IRON_DEPOSIT_POSITION, Color(0.32, 0.40, 0.45))
 
 
 func _add_tree(parent_node: Node3D, coords: Vector2, sapling: bool = false) -> StaticBody3D:
@@ -241,8 +254,8 @@ func _finish_sapling_growth(sapling) -> void:
 
 func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 	var deposit = RESOURCE_SCRIPT.new()
-	deposit.resource_type = "gold" if deposit_name == "GoldMine" else "stone"
-	deposit.remaining = 3000 if deposit.resource_type == "gold" else 2000
+	deposit.resource_type = "gold" if deposit_name == "GoldMine" else ("iron_ore" if deposit_name == "IronOreDeposit" else "stone")
+	deposit.remaining = 4500 if deposit.resource_type == "iron_ore" else (3000 if deposit.resource_type == "gold" else 2000)
 	deposit.clearance_radius = 3.6
 	deposit.depleted.connect(_on_resource_depleted)
 	deposit.collision_layer = 4
@@ -371,6 +384,158 @@ func _cycle_planet() -> void:
 	_set_status("Podglad biomu: %s. To zmiana wygladu mapy, bez teleportacji." % planet_name)
 
 
+func _cancel_build_modes() -> void:
+	build_mode = false
+	forester_build_mode = false
+	mine_build_mode = false
+	smelter_build_mode = false
+
+
+func _toggle_mine_mode() -> void:
+	if mine_build_mode:
+		mine_build_mode = false
+		_set_status("Anulowano budowe kopalni.")
+		return
+	_cancel_build_modes()
+	if factory_mine != null:
+		_set_status("Kopalnia juz istnieje. W tej wersji mozna postawic jedna.")
+		return
+	if not _can_afford(MINE_COST):
+		_set_status("Kopalnia: potrzeba 20 drewna i 10 kamienia.")
+		return
+	mine_build_mode = true
+	_set_status("Wybierz LPM zloze zelaza po prawej stronie mapy, aby postawic kopalnie.")
+
+
+func _try_place_mine(screen_position: Vector2) -> void:
+	var hit := _raycast(screen_position, 4)
+	if hit.is_empty() or hit["collider"].name != "IronOreDeposit":
+		_set_status("Kopalnie stawiamy bezposrednio na zlozu ZELAZA (nie zlota).")
+		return
+	var source = hit["collider"]
+	if source.remaining <= 0 or factory_mine != null:
+		_set_status("To zloze nie jest dostepne.")
+		return
+	if not _spend_resources(MINE_COST):
+		mine_build_mode = false
+		return
+	factory_mine = MINE_SCRIPT.new()
+	factory_mine.ore_source = source
+	factory_mine.position = source.global_position
+	add_child(factory_mine)
+	# Zloze zachowuje ilosc surowca, ale wydobywa je tylko ekstraktor.
+	source.collision_layer = 0
+	source.visible = false
+	source.remove_from_group("resource_nodes")
+	mine_build_mode = false
+	navigation.block_circle(Vector2(source.global_position.x, source.global_position.z), factory_mine.get_access_radius())
+	_update_factory_power()
+	_update_action_buttons()
+	_set_status("Kopalnia uruchomiona! H: postaw hute w poblizu magazynu.")
+	_start_logistics_if_ready()
+
+
+func _toggle_smelter_mode() -> void:
+	if smelter_build_mode:
+		smelter_build_mode = false
+		_set_status("Anulowano budowe huty.")
+		return
+	_cancel_build_modes()
+	if factory_smelter != null:
+		_set_status("Huta juz istnieje. W tej wersji mozna postawic jedna.")
+		return
+	if not _can_afford(SMELTER_COST):
+		_set_status("Huta: potrzeba 30 drewna i 20 kamienia.")
+		return
+	smelter_build_mode = true
+	_set_status("Wybierz LPM wolne miejsce na hute (z dala od rakiety i magazynu).")
+
+
+func _try_place_smelter(screen_position: Vector2) -> void:
+	var hit := _raycast(screen_position, 1)
+	if hit.is_empty():
+		_set_status("Postaw hute na gruncie.")
+		return
+	var hit_pos: Vector3 = hit["position"]
+	var site := Vector3(roundf(hit_pos.x), 0.0, roundf(hit_pos.z))
+	if not _is_smelter_site_clear(site):
+		_set_status("Huta nie zmiesci sie tutaj: odsun ja od przeszkod.")
+		return
+	if not _spend_resources(SMELTER_COST):
+		smelter_build_mode = false
+		return
+	factory_smelter = SMELTER_SCRIPT.new()
+	factory_smelter.position = site
+	add_child(factory_smelter)
+	navigation.block_circle(Vector2(site.x, site.z), SMELTER_RADIUS)
+	smelter_build_mode = false
+	_update_factory_power()
+	_update_action_buttons()
+	_set_status("Huta gotowa. 2 rudy -> 1 metal. Transport uruchamia sie automatycznie.")
+	_start_logistics_if_ready()
+
+
+func _is_smelter_site_clear(site: Vector3) -> bool:
+	if absf(site.x) > 42.0 or absf(site.z) > 42.0:
+		return false
+	if not navigation.is_circle_walkable(Vector2(site.x, site.z), SMELTER_RADIUS):
+		return false
+	if _ground_distance(site, DEPOT_POSITION) < SMELTER_RADIUS + DEPOT_BLOCK_RADIUS + 1.0:
+		return false
+	if _ground_distance(site, LANDER_POSITION) < SMELTER_RADIUS + 4.7:
+		return false
+	if _ground_distance(site, CHARGER_POSITION) < SMELTER_RADIUS + 2.4:
+		return false
+	if town_hall != null and _ground_distance(site, town_hall.global_position) < SMELTER_RADIUS + TOWN_HALL_RADIUS + 0.7:
+		return false
+	for building in foresters:
+		if _ground_distance(site, building.global_position) < SMELTER_RADIUS + FORESTER_RADIUS + 0.7:
+			return false
+	for worker in workers:
+		if _ground_distance(site, worker.global_position) < SMELTER_RADIUS + 0.9:
+			return false
+	return true
+
+
+func _update_factory_power() -> void:
+	if landing_rocket == null or charging_pad == null:
+		return
+	var power: float = landing_rocket.solar_output()
+	if charging_pad.can_charge():
+		power -= charging_pad.REQUIRED_POWER
+	if factory_mine != null:
+		factory_mine.power_enabled = power >= factory_mine.POWER_KW
+		if factory_mine.power_enabled:
+			power -= factory_mine.POWER_KW
+	if factory_smelter != null:
+		factory_smelter.power_enabled = power >= factory_smelter.POWER_KW
+		if factory_smelter.power_enabled:
+			power -= factory_smelter.POWER_KW
+	unused_power_kw = maxf(0.0, power)
+
+
+func _start_logistics_if_ready() -> void:
+	if factory_mine == null or factory_smelter == null:
+		return
+	for robot in workers:
+		if robot.robot_role == "hauler":
+			robot.command_factory_route(factory_mine, factory_smelter, navigation, DEPOT_POSITION)
+			_set_status("Automatyka: transportowiec odbiera rude, wiezie do huty i dostarcza metal.")
+			return
+
+
+func _assign_factory_haulers(robots: Array) -> void:
+	if factory_mine == null or factory_smelter == null:
+		_set_status("Najpierw postaw kopalnie (M) i hute (H).")
+		return
+	var assigned: int = 0
+	for robot in robots:
+		if robot.robot_role == "hauler":
+			robot.command_factory_route(factory_mine, factory_smelter, navigation, DEPOT_POSITION)
+			assigned += 1
+	_set_status("Transport przydzielony: %d robot(ow). PPM na ziemi przerywa zadanie." % assigned)
+
+
 func _on_resource_depleted(resource, clearance_radius: float) -> void:
 	var p: Vector3 = resource.global_position
 	navigation.unblock_circle(Vector2(p.x, p.z), clearance_radius)
@@ -448,6 +613,8 @@ func _create_hud() -> void:
 	hud.build_forester_requested.connect(_toggle_forester_mode)
 	hud.train_robot_requested.connect(_train_worker)
 	hud.charge_requested.connect(_charge_selected)
+	hud.mine_requested.connect(_toggle_mine_mode)
+	hud.smelter_requested.connect(_toggle_smelter_mode)
 	hud.planet_change_requested.connect(_cycle_planet)
 	add_child(hud)
 
@@ -466,6 +633,7 @@ func _process(delta: float) -> void:
 	hud_elapsed += delta
 	if hud_elapsed >= 0.25:
 		hud_elapsed = 0.0
+		_update_factory_power()
 		_update_colony_hud()
 
 
@@ -474,6 +642,7 @@ func _update_colony_hud() -> void:
 		return
 	if landing_rocket != null and charging_pad != null:
 		hud.set_power(landing_rocket.solar_output(), charging_pad.can_charge())
+		hud.set_power_balance(unused_power_kw)
 
 	if selected_workers.size() == 1:
 		var robot = selected_workers[0]
@@ -489,6 +658,10 @@ func _update_colony_hud() -> void:
 			hud.set_structure("CENTRUM DOWODZENIA", "Produkcja robotow: klawisz T.")
 		elif selected_structure in foresters:
 			hud.set_structure("MODUL REKULTYWACJI", "Odnawianie drzew: cykl 8 sekund.")
+		elif selected_structure == factory_mine:
+			hud.set_structure("KOPALNIA ZELAZA", factory_mine.describe())
+		elif selected_structure == factory_smelter:
+			hud.set_structure("HUTA METALU", factory_smelter.describe())
 		else:
 			hud.set_no_selection()
 	else:
@@ -521,9 +694,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_P:
 			_cycle_planet()
 			return
-		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode):
-			build_mode = false
-			forester_build_mode = false
+		if event.keycode == KEY_M:
+			_toggle_mine_mode()
+			return
+		if event.keycode == KEY_H:
+			_toggle_smelter_mode()
+			return
+		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode):
+			_cancel_build_modes()
 			_set_status("Anulowano budowe.")
 			return
 
@@ -539,6 +717,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
+		if mine_build_mode:
+			if event.pressed:
+				_try_place_mine(event.position)
+			return
+		if smelter_build_mode:
+			if event.pressed:
+				_try_place_smelter(event.position)
+			return
 		if forester_build_mode:
 			if event.pressed:
 				_try_place_forester(event.position)
@@ -561,9 +747,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_dragging = false
 
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		if build_mode or forester_build_mode:
-			build_mode = false
-			forester_build_mode = false
+		if build_mode or forester_build_mode or mine_build_mode or smelter_build_mode:
+			_cancel_build_modes()
 			_set_status("Anulowano budowe.")
 		else:
 			_command_move_selected(event.position)
@@ -580,7 +765,7 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 	var building_hit := _raycast(screen_position, 8)
 	if building_hit.has("collider"):
 		var structure = building_hit["collider"]
-		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters:
+		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter:
 			selected_structure = structure
 			if structure == town_hall:
 				_set_status("Centrum: T szkoli kolejnego gornika.")
@@ -590,6 +775,10 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 				_set_status("Wybierz technika i kliknij PPM na rakiecie, aby ja naprawic.")
 			elif structure == charging_pad:
 				_set_status("Ladowarka: C wysyla zaznaczone roboty do ladowania.")
+			elif structure == factory_mine:
+				_set_status("Kopalnia: %s" % factory_mine.describe())
+			elif structure == factory_smelter:
+				_set_status("Huta: %s" % factory_smelter.describe())
 
 
 func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
@@ -614,6 +803,12 @@ func _command_move_selected(screen_position: Vector2) -> void:
 	var resource_hit := _raycast(screen_position, 4)
 	if resource_hit.has("collider"):
 		var clicked_object = resource_hit["collider"]
+		if clicked_object == factory_mine or clicked_object == factory_smelter:
+			_assign_factory_haulers(selected_workers)
+			return
+		if clicked_object.has_method("harvest") and clicked_object.resource_type == "iron_ore":
+			_set_status("Ruda zelaza wymaga kopalni: M, a potem LPM na zlozu.")
+			return
 		if clicked_object.has_method("harvest"):
 			for worker in selected_workers:
 				if worker.robot_role != "engineer":
@@ -691,6 +886,8 @@ func _create_training_timer() -> void:
 
 
 func _toggle_build_mode() -> void:
+	mine_build_mode = false
+	smelter_build_mode = false
 	if forester_build_mode:
 		forester_build_mode = false
 	if town_hall != null:
@@ -757,6 +954,8 @@ func _ground_distance(a: Vector3, b: Vector3) -> float:
 
 
 func _toggle_forester_mode() -> void:
+	mine_build_mode = false
+	smelter_build_mode = false
 	if build_mode:
 		build_mode = false
 	if forester_build_mode:
@@ -954,6 +1153,7 @@ func _update_action_buttons() -> void:
 			foresters.size() >= MAX_FORESTERS,
 			not selected_workers.is_empty()
 		)
+		hud.set_factory_availability(factory_mine != null, factory_smelter != null)
 
 
 func _on_resource_delivered(resource_type: String, amount: int) -> void:
@@ -970,6 +1170,7 @@ func _update_resource_hud() -> void:
 		int(resource_totals["wood"]),
 		int(resource_totals["gold"]),
 		int(resource_totals["stone"]),
+		int(resource_totals["metal"]),
 		workers.size(),
 		MAX_WORKERS
 	)
