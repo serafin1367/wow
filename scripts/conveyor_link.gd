@@ -137,7 +137,7 @@ func _build_track() -> void:
 		_add_box("Frame", center + Vector3(0, 0.30, 0), Vector3(1.16, 0.25, length + 0.08), frame_material, rotation)
 		_add_box("Belt", center + Vector3(0, 0.48, 0), Vector3(0.92, 0.09, length + 0.08), belt_material, rotation)
 		for side in [-1.0, 1.0]:
-			var lateral := Vector3(cos(rotation), 0, -sin(rotation)) * side * 0.52
+			var lateral: Vector3 = Vector3(cos(rotation), 0.0, -sin(rotation)) * float(side) * 0.52
 			_add_box("OrangeRail", center + lateral + Vector3(0, 0.63, 0), Vector3(0.075, 0.22, length + 0.08), accent_material, rotation)
 
 
