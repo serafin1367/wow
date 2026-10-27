@@ -9,6 +9,8 @@ signal charge_requested
 signal planet_change_requested
 signal mine_requested
 signal smelter_requested
+signal ore_conveyor_requested
+signal metal_conveyor_requested
 
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
@@ -33,6 +35,8 @@ var charge_button: Button
 var planet_button: Button
 var mine_button: Button
 var smelter_button: Button
+var ore_belt_button: Button
+var metal_belt_button: Button
 var balance_label: Label
 
 
@@ -81,7 +85,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.6", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.7", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -184,6 +188,14 @@ func _make_bottom_bar() -> void:
 	smelter_button.custom_minimum_size.y = 37
 	smelter_button.pressed.connect(func(): smelter_requested.emit())
 	factory_actions.add_child(smelter_button)
+	ore_belt_button = _action_button("J   TASMA RUDY", "5 metalu: polacz kopalnie z huta", ORANGE)
+	ore_belt_button.custom_minimum_size.y = 37
+	ore_belt_button.pressed.connect(func(): ore_conveyor_requested.emit())
+	factory_actions.add_child(ore_belt_button)
+	metal_belt_button = _action_button("N   TASMA METALU", "8 metalu: polacz hute z magazynem", TURQUOISE)
+	metal_belt_button.custom_minimum_size.y = 37
+	metal_belt_button.pressed.connect(func(): metal_conveyor_requested.emit())
+	factory_actions.add_child(metal_belt_button)
 
 	event_label = _label("Gotowosc systemow kolonii.", 13, TEXT)
 	event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -229,6 +241,13 @@ func set_factory_availability(mine_exists: bool, smelter_exists: bool) -> void:
 		mine_button.disabled = mine_exists
 	if smelter_button != null:
 		smelter_button.disabled = smelter_exists
+
+
+func set_conveyor_availability(ore_built: bool, metal_built: bool, machines_ready: bool) -> void:
+	if ore_belt_button != null:
+		ore_belt_button.disabled = ore_built or not machines_ready
+	if metal_belt_button != null:
+		metal_belt_button.disabled = metal_built or not machines_ready
 
 
 func set_status(message: String) -> void:
