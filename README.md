@@ -38,7 +38,7 @@ Wszystkie ponizsze modele sa **oryginalne, proceduralne** (GDScript: BoxMesh,
 CylinderMesh i StandardMaterial3D) i naleza do projektu WOW, bez pobierania platnych
 lub cudzych modeli:
 
-- `scripts/colony_lander.gd` — rakieta z panelami fotowoltaicznymi i rampa.
+- `scripts/colony_lander.gd` — autorska, smukla rakieta wielostopniowa: stozkowa owiewka, centralny korpus, 2 boczne boostery, dysze silnikow, pomaranczowe obręcze, podpory ladowania, niewielkie panele PV i rampa robotow. Stylistyka przemyslowego low-poly, inspirowana ogolna konstrukcja rakiet z Kerbal Space Program (bez kopiowania assetow gry).
 - `scripts/charging_pad.gd` — stacja ladowania.
 - `scripts/robot_model.gd` — trzy rozne sylwetki robotow.
 - `scripts/factory_models.gd` — **wiertnica, tasmociag i huta**; na razie tylko modele.
@@ -50,6 +50,23 @@ lub cudzych modeli:
 **Wazne:** uruchomienie `asset_showroom.tscn` pokazuje modele wizualne. Wiertnica,
 tasmociag i huta nie przetwarzaja jeszcze surowcow. Wlasciwa gra startuje w
 `scenes/main.tscn`.
+
+## Zmiana kierunku wizualnego rakiety (wzor: klasyczna konstrukcja rakietowa)
+
+Zgodnie z referencjami graficznymi: rakieta ma teraz proporcje nosiciela
+wielostopniowego z bocznymi boosterami, zamiast wygladu kapsuly z szeroko
+rozstawionymi skrzydlami paneli slonecznych.
+
+- Centralny korpus jest podzielony na dwa stopnie i zwienczony owiewka.
+- Dwa boczne boostery maja osobne zbiorniki, mocowania i dysze wylotowe.
+- Kolory sa dopasowane do gorniczego robota: grafit, stal, pomarancz i turkus.
+- Fotowoltaika pozostaje na pokladzie, ale panele sa zlozone do kompaktowych
+  rozmiarow, umieszczone wysoko i nie zmieniaja charakteru rakiety.
+- Zasilanie 12 kW, naprawianie statku i wyjazd robotow z rampy pozostaja
+  funkcjonalnie bez zmian.
+
+Dla oceny sylwetki uruchom `scenes/asset_showroom.tscn` klawiszem **F6**.
+Nowy model wymaga przetestowania w silniku Godot.
 
 ## Aktualizacja i test
 
