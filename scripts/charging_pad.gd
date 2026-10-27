@@ -49,6 +49,10 @@ func available_rate() -> float:
 	return CHARGE_RATE if can_charge() else 0.0
 
 
+func get_access_radius() -> float:
+	return CLEARANCE_RADIUS
+
+
 func repair(amount: float) -> float:
 	var restored: float = minf(maxf(amount, 0.0), MAX_HEALTH - health)
 	health += restored
