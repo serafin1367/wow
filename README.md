@@ -4,6 +4,59 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.6 — pierwsza fabryka (wydobycie, transport, przetop)
+
+Zaimplementowano dzialajacy system kopalnia zelaza -> robot transportowy -> huta
+-> magazyn. To pierwszy etap automatyzacji przed przenosnikami i fabrykami.
+
+**Nowe zasoby:**
+- Naturalne zloze `iron_ore` z 4500 jednostkami, po prawej stronie mapy.
+- Kopalnia wydobywa **4 rudy / 1.5 s**, maksymalnie **80 rudy** w lokalnym buforze.
+- Robot transportowy odbiera do **25 jednostek** i dowozi rudy do huty.
+- Huta przetwarza **2 jednostki rudy -> 1 sztabka metalu co 3 s**.
+- Gotowy metal robot zawozi do magazynu; licznik **METAL** jest na HUD.
+- Pozostale zasoby (drewno, zloto, kamien) zachowuja dotychczasowa mechanike.
+
+**Energia kolonii:**
+- Na starcie statek ma 70% sprawnosci -> 8.4 kW.
+- Stacja ladowania: rezerwacja do 4 kW, jesli jest aktywna.
+- Kopalnia: 1.5 kW.
+- Huta: 2.5 kW.
+- Reszta mocy wyswietlana jako REZERWA w gornym pasku.
+- Brak mocy zatrzymuje produkcje maszyny, ale nie kasuje buforow.
+- Naprawa statku zwieksza jego dostepna moc.
+- Wersja jest uproszczona: jedna siec bazowa, bez osobnych kabli i
+  akumulatorow stacjonarnych; budynki liczone sa jako podlaczone do statku.
+
+**Sterowanie i budowa:**
+1. Na starcie rakieta ma zapas **90 drewna + 60 kamienia** — materialy
+   demonstracyjne na poczatkowy kompleks przemyslowy.
+2. Nacisnij **M** (albo przycisk `M KOPALNIA ZELAZA`) i kliknij **LPM na
+   zlozu zelaza** w prawej czesci mapy.
+   Koszt: 20 drewna + 10 kamienia.
+3. Nacisnij **H** (albo `H HUTA METALU`), wybierz LPM miejsce na wolnym
+   terenie, najlepiej niedaleko kopalni i magazynu.
+   Koszt: 30 drewna + 20 kamienia.
+4. Transportowy robot turkusowy zostanie automatycznie przydzielony do
+   transportu. Mozesz tez zaznaczyc go i kliknac PPM na kopalni lub hucie,
+   zeby ponownie przydzielic trasę.
+5. Zaznacz kopalnie albo hute LPM: dolny panel pokazuje stan lokalnego
+   zapasu i pobor mocy. Obserwuj licznik METAL po dostawie.
+6. Klawisz P nadal przelacza Mars / Ziemia / Kepler bez resetowania fabryki.
+
+**Anulowanie rozkazow:** PPM na ziemi wysyla transportowca w inne miejsce
+i zatrzymuje automatyczny kurs. Przy ponownym przydzieleniu PPM na kopalni
+robot wznowi cykl.
+
+Ograniczenia: po jednym obiekcie kazdego typu w tej wersji, bez fizycznych
+tasmociagow i grafu polaczen energetycznych, bez budowy przez technika
+i bez animowanych ladunkow robotow. Zloze zelaza jest ukrywane przez budynek
+kopalni, ale ilosc rudy jest rzeczywiscie konsumowana i konczy sie.
+
+Skrypty: `scripts/automated_mine.gd`, `scripts/automated_smelter.gd`,
+`scripts/worker.gd` (nowa maszyna stanow robota), `scripts/main.gd`.
+Testy: `tests/factory_smoke.gd`, `tests/planet_smoke.gd`.
+
 ## WOW 0.5 — trzy planety i nowa oprawa srodowiska
 
 Prototyp moze przedstawic kilka odmiennych swiatow bez przepisywania mechaniki
