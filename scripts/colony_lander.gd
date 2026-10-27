@@ -113,6 +113,7 @@ func _ready() -> void:
 	info.font_size = 43
 	info.pixel_size = 0.009
 	info.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	info.visible = false # Wskazania przeniesione do panelu HUD.
 	add_child(info)
 	_refresh_label()
 
