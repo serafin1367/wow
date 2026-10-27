@@ -85,7 +85,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.7", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.8", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -188,11 +188,11 @@ func _make_bottom_bar() -> void:
 	smelter_button.custom_minimum_size.y = 37
 	smelter_button.pressed.connect(func(): smelter_requested.emit())
 	factory_actions.add_child(smelter_button)
-	ore_belt_button = _action_button("J   TASMA RUDY", "5 metalu: polacz kopalnie z huta", ORANGE)
+	ore_belt_button = _action_button("J   TASMA RUDY", "J = automatycznie, Shift+J = recznie (LPM punkty, Enter buduj)", ORANGE)
 	ore_belt_button.custom_minimum_size.y = 37
 	ore_belt_button.pressed.connect(func(): ore_conveyor_requested.emit())
 	factory_actions.add_child(ore_belt_button)
-	metal_belt_button = _action_button("N   TASMA METALU", "8 metalu: polacz hute z magazynem", TURQUOISE)
+	metal_belt_button = _action_button("N   TASMA METALU", "N = automatycznie, Shift+N = recznie (LPM punkty, Enter buduj)", TURQUOISE)
 	metal_belt_button.custom_minimum_size.y = 37
 	metal_belt_button.pressed.connect(func(): metal_conveyor_requested.emit())
 	factory_actions.add_child(metal_belt_button)
@@ -211,7 +211,10 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("LPM   Wybierz / grupa", 13, TEXT))
 	help.add_child(_label("PPM   Ruch / zadanie", 13, TEXT))
 	help.add_child(_label("WASD   Kamera", 13, TEXT))
-	help.add_child(_label("ESC   Anuluj budowe", 13, TEXT))
+	help.add_child(_label("Q/E   Obroc kamere", 12, TEXT))
+	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
+	help.add_child(_label("ENTER   Zbuduj trase", 12, TEXT))
+	help.add_child(_label("ESC   Anuluj budowe", 12, TEXT))
 
 
 func set_planet(planet: String) -> void:
