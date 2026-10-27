@@ -12,6 +12,9 @@ const LANDER_SCRIPT = preload("res://scripts/colony_lander.gd")
 const CHARGER_SCRIPT = preload("res://scripts/charging_pad.gd")
 const HUD_SCRIPT = preload("res://scripts/colony_hud.gd")
 const KENNEY_ASSETS = preload("res://scripts/kenney_assets.gd")
+const PLANET_SCRIPT = preload("res://scripts/planet_environment.gd")
+const DEPOT_VISUAL_SCRIPT = preload("res://scripts/depot_model.gd")
+const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
 const FORESTER_COST: Dictionary = {"wood": 30, "stone": 10}
@@ -45,6 +48,7 @@ var charging_pad = null
 var hud_elapsed: float = 0.0
 var hud = null
 var selected_structure = null
+var planet_env = null
 
 
 func _ready() -> void:
@@ -53,6 +57,7 @@ func _ready() -> void:
 	_create_resources()
 	_create_depot()
 	_create_landing_site()
+	_create_planet_environment()
 	_create_workers()
 	_create_camera()
 	_create_hud()
@@ -101,29 +106,8 @@ func _create_ground() -> void:
 	collision.position.y = -0.1
 	ground.add_child(collision)
 
-	# Niewielka nieregularnosc powierzchni: mineralne plamy widoczne z gory.
-	# Elementy sa plaskie, nie zmieniaja siatki ruchu robotow.
-	var dust_colors: Array[Color] = [
-		Color(0.24, 0.31, 0.29),
-		Color(0.27, 0.37, 0.32),
-		Color(0.18, 0.29, 0.28)
-	]
-	for i in range(36):
-		var angle: float = float(i) * 2.39996
-		var distance: float = 8.0 + float((i * 17) % 40)
-		var place := Vector3(cos(angle) * distance, 0.014, sin(angle) * distance)
-		var patch := MeshInstance3D.new()
-		patch.name = "MineralPatch%d" % i
-		var surface := CylinderMesh.new()
-		surface.top_radius = 1.2 + float(i % 5) * 0.48
-		surface.bottom_radius = surface.top_radius
-		surface.height = 0.015
-		surface.radial_segments = 10
-		patch.mesh = surface
-		patch.position = place
-		patch.scale.z = 0.6 + float(i % 4) * 0.24
-		patch.material_override = _make_material(dust_colors[i % dust_colors.size()])
-		add_child(patch)
+	# Material proceduralny i detale planety tworzy PlanetEnvironment.
+	# Podloze pozostaje poziome, aby zachowac obecna nawigacje A*.
 
 	# Strefa ladowania rakiety, z przemyslowym obramowaniem.
 	var pad := MeshInstance3D.new()
@@ -227,6 +211,9 @@ func _add_tree(parent_node: Node3D, coords: Vector2, sapling: bool = false) -> S
 	crown_collision.position.y = 3.35
 	tree.add_child(crown_collision)
 
+	if planet_env != null:
+		planet_env.apply_resource_colors([tree])
+
 	if sapling:
 		var growth := create_tween()
 		growth.tween_property(tree, "scale", Vector3.ONE, TREE_GROW_SECONDS)
@@ -265,21 +252,49 @@ func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 	add_child(deposit)
 	deposit.add_to_group("resource_nodes")
 
+	# Ciemy kamien i fizyczne zyly mineralne zamiast zoltych bryl.
 	var rock_variants: Array[String] = ["rock-largea", "rock-largeb", "rock-largec"]
 	for i in range(4):
-		var rock = KENNEY_ASSETS.model("nature", rock_variants[i % rock_variants.size()], 3.0 + float(i) * 0.25)
+		var offset := Vector3(float(i % 2) * 2.0 - 1.0, 0.0, float(i / 2) * 2.0 - 1.0)
+		var base_rock: Color = Color(0.27, 0.24, 0.24) if deposit.resource_type == "gold" else Color(0.40, 0.42, 0.43)
+		var rock = KENNEY_ASSETS.model("nature", rock_variants[i % rock_variants.size()], 2.8 + float(i) * 0.16)
 		if rock != null:
-			rock.position = Vector3(float(i % 2) * 2.0 - 1.0, 0.0, float(i / 2) * 2.0 - 1.0)
-			KENNEY_ASSETS.tint_meshes(rock, tint)
+			rock.name = "OreRock_%d" % i
+			rock.position = offset
+			KENNEY_ASSETS.tint_meshes(rock, base_rock)
 			deposit.add_child(rock)
 		else:
 			var fallback := MeshInstance3D.new()
+			fallback.name = "OreRock_%d" % i
 			var mesh := SphereMesh.new()
 			mesh.radius = 0.9
 			fallback.mesh = mesh
-			fallback.position = Vector3(float(i % 2) * 2.0 - 1.0, 0.9, float(i / 2) * 2.0 - 1.0)
-			fallback.material_override = _make_material(tint)
+			fallback.position = offset + Vector3(0, 0.9, 0)
+			fallback.material_override = _make_material(base_rock)
 			deposit.add_child(fallback)
+
+		# Blaszczace zyla w skale i krysztaly wystajace z powierzchni.
+		var vein := MeshInstance3D.new()
+		vein.name = "Vein_%d" % i
+		var vein_mesh := BoxMesh.new()
+		vein_mesh.size = Vector3(1.05 + float(i) * 0.17, 0.13, 0.22)
+		vein.mesh = vein_mesh
+		vein.position = offset + Vector3(-0.12, 1.25 + float(i % 2) * 0.16, 0.10)
+		vein.rotation_degrees = Vector3(0.0, float(i * 34), 8.0 + float(i) * 5.0)
+		vein.material_override = _make_material(Color(0.95, 0.65, 0.15) if deposit.resource_type == "gold" else Color(0.33, 0.78, 0.83))
+		deposit.add_child(vein)
+		if deposit.resource_type == "gold":
+			var tip := MeshInstance3D.new()
+			tip.name = "OreCrystal_%d" % i
+			var crystal := CylinderMesh.new()
+			crystal.bottom_radius = 0.38
+			crystal.top_radius = 0.025
+			crystal.height = 0.92 + float(i % 3) * 0.22
+			crystal.radial_segments = 5
+			tip.mesh = crystal
+			tip.position = offset + Vector3(0.26, 1.65, -0.20)
+			tip.material_override = _make_material(Color(0.91, 0.56, 0.12))
+			deposit.add_child(tip)
 
 	var obstacle_collision := CollisionShape3D.new()
 	var obstacle_shape := BoxShape3D.new()
@@ -306,38 +321,8 @@ func _create_depot() -> void:
 	depot.add_child(storage_collision)
 	navigation.block_circle(Vector2(DEPOT_POSITION.x, DEPOT_POSITION.z), DEPOT_BLOCK_RADIUS)
 
-	var platform := MeshInstance3D.new()
-	platform.name = "StoragePlatform"
-	var platform_mesh := BoxMesh.new()
-	platform_mesh.size = Vector3(4.0, 0.35, 4.0)
-	platform.mesh = platform_mesh
-	platform.position.y = 0.18
-	platform.material_override = _make_material(Color(0.26, 0.35, 0.41))
-	depot.add_child(platform)
-
-	for i in range(3):
-		var crate_name := "box-large" if i == 1 else "box-small"
-		var crate = KENNEY_ASSETS.model("factory", crate_name, 1.25)
-		if crate != null:
-			crate.position = Vector3(float(i) - 1.0, 0.35, 0.0)
-			depot.add_child(crate)
-		else:
-			var fallback := MeshInstance3D.new()
-			var box := BoxMesh.new()
-			box.size = Vector3(0.9, 1.0, 0.9)
-			fallback.mesh = box
-			fallback.position = Vector3(float(i) - 1.0, 0.85, 0.0)
-			fallback.material_override = _make_material(Color(0.45, 0.57, 0.61))
-			depot.add_child(fallback)
-
-	var depot_name := Label3D.new()
-	depot_name.text = "MAGAZYN KOLONII"
-	depot_name.position.y = 2.6
-	depot_name.font_size = 40
-	depot_name.pixel_size = 0.008
-	depot_name.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	depot.add_child(depot_name)
-
+	var warehouse = DEPOT_VISUAL_SCRIPT.new()
+	depot.add_child(warehouse)
 
 func _create_landing_site() -> void:
 	# Rakieta jest juz po ladowaniu. Zostanie pozniej zastapiona animacja lotu.
@@ -362,6 +347,28 @@ func _create_landing_site() -> void:
 	cable.rotation.y = -atan2(CHARGER_POSITION.z - LANDER_POSITION.z, CHARGER_POSITION.x - LANDER_POSITION.x)
 	cable.material_override = _make_material(Color(0.09, 0.78, 0.85))
 	add_child(cable)
+
+
+func _create_planet_environment() -> void:
+	planet_env = PLANET_SCRIPT.new()
+	add_child(planet_env)
+	planet_env.initialize(
+		get_node("Ground/Grass") as MeshInstance3D,
+		get_node("WorldEnvironment") as WorldEnvironment,
+		get_node("Sun") as DirectionalLight3D,
+		START_PLANET
+	)
+	planet_env.apply_resource_colors(get_tree().get_nodes_in_group("resource_nodes"))
+
+
+func _cycle_planet() -> void:
+	if planet_env == null:
+		return
+	var planet_name: String = planet_env.next_planet()
+	planet_env.apply_resource_colors(get_tree().get_nodes_in_group("resource_nodes"))
+	if hud != null:
+		hud.set_planet(planet_name)
+	_set_status("Podglad biomu: %s. To zmiana wygladu mapy, bez teleportacji." % planet_name)
 
 
 func _on_resource_depleted(resource, clearance_radius: float) -> void:
@@ -441,6 +448,7 @@ func _create_hud() -> void:
 	hud.build_forester_requested.connect(_toggle_forester_mode)
 	hud.train_robot_requested.connect(_train_worker)
 	hud.charge_requested.connect(_charge_selected)
+	hud.planet_change_requested.connect(_cycle_planet)
 	add_child(hud)
 
 	selection_box = SELECTION_BOX_SCRIPT.new()
@@ -450,6 +458,7 @@ func _create_hud() -> void:
 	_set_status("Trzy roboty opuscily rakiete. Zacznij od wydobycia i naprawy paneli.")
 	_update_action_buttons()
 	_update_resource_hud()
+	hud.set_planet(START_PLANET)
 	_update_colony_hud()
 
 
@@ -508,6 +517,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_C:
 			_charge_selected()
+			return
+		if event.keycode == KEY_P:
+			_cycle_planet()
 			return
 		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode):
 			build_mode = false
