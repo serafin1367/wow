@@ -1,0 +1,25 @@
+name: Godot project smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  godot-headless:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: false
+      - name: Import and parse project resources
+        run: godot --headless --path . --editor --quit
+      - name: Run main scene for 120 frames
+        run: godot --headless --path . --quit-after 120
+      - name: Validate assets showroom
+        run: godot --headless --path . --quit-after 10 res://scenes/asset_showroom.tscn
