@@ -3,10 +3,17 @@ extends Node3D
 
 const WORKER_SCRIPT = preload("res://scripts/worker.gd")
 const CAMERA_SCRIPT = preload("res://scripts/rts_camera.gd")
+const NAVIGATION_SCRIPT = preload("res://scripts/navigation_grid.gd")
+const SELECTION_BOX_SCRIPT = preload("res://scripts/selection_box.gd")
 const MAP_SIZE: float = 100.0
 
 var workers: Array = []
 var selected_workers: Array = []
+var navigation = NAVIGATION_SCRIPT.new()
+var selection_box: Control
+var mouse_down: bool = false
+var is_dragging: bool = false
+var drag_start: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -79,7 +86,9 @@ func _create_resources() -> void:
 
 
 func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
-	var tree := Node3D.new()
+	var tree := StaticBody3D.new()
+	tree.collision_layer = 4
+	tree.collision_mask = 0
 	tree.name = "Tree"
 	tree.position = Vector3(coords.x, 0.0, coords.y)
 	parent_node.add_child(tree)
@@ -105,9 +114,20 @@ func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
 	leaves.material_override = _make_material(Color(0.10, 0.37, 0.16))
 	tree.add_child(leaves)
 
+	var trunk_collision := CollisionShape3D.new()
+	var trunk_shape := CylinderShape3D.new()
+	trunk_shape.radius = 0.6
+	trunk_shape.height = 2.5
+	trunk_collision.shape = trunk_shape
+	trunk_collision.position.y = 1.25
+	tree.add_child(trunk_collision)
+	navigation.block_circle(coords, 1.6)
+
 
 func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
-	var deposit := Node3D.new()
+	var deposit := StaticBody3D.new()
+	deposit.collision_layer = 4
+	deposit.collision_mask = 0
 	deposit.name = deposit_name
 	deposit.position = location
 	add_child(deposit)
@@ -125,6 +145,14 @@ func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
 		rock.scale = Vector3(1.5, 1.0 + float(i) * 0.15, 1.4)
 		rock.material_override = _make_material(tint)
 		deposit.add_child(rock)
+
+	var obstacle_collision := CollisionShape3D.new()
+	var obstacle_shape := BoxShape3D.new()
+	obstacle_shape.size = Vector3(5.0, 2.5, 5.0)
+	obstacle_collision.shape = obstacle_shape
+	obstacle_collision.position.y = 1.25
+	deposit.add_child(obstacle_collision)
+	navigation.block_circle(Vector2(location.x, location.z), 3.6)
 
 
 func _create_workers() -> void:
@@ -154,7 +182,7 @@ func _create_hud() -> void:
 	add_child(ui)
 	var hint := Label.new()
 	hint.name = "Controls"
-	hint.text = "WOW - RTS prototype | LPM: wybierz | Shift+LPM: dodaj | PPM: ruch | WASD / krawedzie: kamera | Rolka: zoom"
+	hint.text = "WOW | LPM: wybierz | Przeciagnij LPM: grupa | Shift: dodaj | PPM: ruch | WASD: kamera | Rolka: zoom"
 	hint.position = Vector2(16, 14)
 	hint.add_theme_font_size_override("font_size", 16)
 	hint.add_theme_color_override("font_color", Color.WHITE)
@@ -163,31 +191,81 @@ func _create_hud() -> void:
 	hint.add_theme_constant_override("shadow_offset_y", 2)
 	ui.add_child(hint)
 
+	selection_box = SELECTION_BOX_SCRIPT.new()
+	selection_box.name = "SelectionBox"
+	selection_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	selection_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(selection_box)
+
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton and event.pressed):
+	if event is InputEventMouseMotion and mouse_down:
+		var distance := drag_start.distance_to(event.position)
+		if distance >= 8.0:
+			is_dragging = true
+		if is_dragging:
+			selection_box.show_selection(drag_start, event.position)
+		return
+
+	if not (event is InputEventMouseButton):
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
-		var hit := _raycast(event.position, 2)
-		var append := Input.is_key_pressed(KEY_SHIFT)
-		if not append:
-			_clear_selection()
-		if hit.has("collider") and hit["collider"] in workers:
-			_select_worker(hit["collider"])
+		if event.pressed:
+			mouse_down = true
+			is_dragging = false
+			drag_start = event.position
+		elif mouse_down:
+			mouse_down = false
+			selection_box.hide_selection()
+			if is_dragging:
+				_select_in_rectangle(Rect2(drag_start, event.position - drag_start).abs(), event.shift_pressed)
+			else:
+				_select_by_click(event.position, event.shift_pressed)
+			is_dragging = false
 
-	elif event.button_index == MOUSE_BUTTON_RIGHT:
-		if selected_workers.is_empty():
-			return
-		var hit := _raycast(event.position, 1)
-		if hit.is_empty():
-			return
-		var target: Vector3 = hit["position"]
-		for i in range(selected_workers.size()):
-			var column := float(i % 3)
-			var row := float(floori(float(i) / 3.0))
-			var offset := Vector3((column - 1.0) * 1.8, 0.0, row * 1.8)
-			selected_workers[i].command_move(target + offset)
+	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		_command_move_selected(event.position)
+
+
+func _select_by_click(screen_position: Vector2, additive: bool) -> void:
+	var hit := _raycast(screen_position, 2)
+	if not additive:
+		_clear_selection()
+	if hit.has("collider") and hit["collider"] in workers:
+		_select_worker(hit["collider"])
+
+
+func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
+	if not additive:
+		_clear_selection()
+	var active_camera := get_viewport().get_camera_3d()
+	if active_camera == null:
+		return
+	for worker in workers:
+		var point: Vector3 = worker.global_position + Vector3(0.0, 0.9, 0.0)
+		if active_camera.is_position_behind(point):
+			continue
+		var projected: Vector2 = active_camera.unproject_position(point)
+		if rectangle.has_point(projected):
+			_select_worker(worker)
+
+
+func _command_move_selected(screen_position: Vector2) -> void:
+	if selected_workers.is_empty():
+		return
+	var hit := _raycast(screen_position, 1)
+	if hit.is_empty():
+		return
+	var target: Vector3 = hit["position"]
+	for i in range(selected_workers.size()):
+		var column := float(i % 3)
+		var row := float(floori(float(i) / 3.0))
+		var offset := Vector3((column - 1.0) * 1.8, 0.0, row * 1.8)
+		var worker = selected_workers[i]
+		var path: Array[Vector3] = navigation.find_path(worker.global_position, target + offset)
+		if not path.is_empty():
+			worker.command_move(path)
 
 
 func _raycast(screen_position: Vector2, mask: int) -> Dictionary:
