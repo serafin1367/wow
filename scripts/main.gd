@@ -7,6 +7,11 @@ const NAVIGATION_SCRIPT = preload("res://scripts/navigation_grid.gd")
 const SELECTION_BOX_SCRIPT = preload("res://scripts/selection_box.gd")
 const RESOURCE_SCRIPT = preload("res://scripts/resource_node.gd")
 const TOWN_HALL_SCRIPT = preload("res://scripts/town_hall.gd")
+const FORESTER_SCRIPT = preload("res://scripts/forester_hut.gd")
+const FORESTER_COST: Dictionary = {"wood": 30, "stone": 10}
+const FORESTER_RADIUS: float = 3.1
+const MAX_FORESTERS: int = 4
+const TREE_GROW_SECONDS: float = 30.0
 const TOWN_HALL_COST: Dictionary = {"wood": 40, "stone": 20}
 const WORKER_COST: Dictionary = {"wood": 10, "gold": 20}
 const TOWN_HALL_RADIUS: float = 4.5
@@ -27,6 +32,9 @@ var resource_label: Label
 var status_label: Label
 var build_button: Button
 var train_button: Button
+var forester_button: Button
+var forester_build_mode: bool = false
+var foresters: Array = []
 var build_mode: bool = false
 var town_hall: StaticBody3D
 var training_timer: Timer
@@ -104,13 +112,15 @@ func _create_resources() -> void:
 	_add_deposit("StoneQuarry", Vector3(29.0, 0.0, 18.0), Color(0.48, 0.50, 0.53))
 
 
-func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
+func _add_tree(parent_node: Node3D, coords: Vector2, sapling: bool = false) -> StaticBody3D:
 	var tree = RESOURCE_SCRIPT.new()
 	tree.resource_type = "wood"
-	tree.remaining = 200
+	tree.is_sapling = sapling
+	tree.remaining = 0 if sapling else 200
 	tree.clearance_radius = 1.6
 	tree.depleted.connect(_on_resource_depleted)
-	tree.collision_layer = 4
+	tree.collision_layer = 0 if sapling else 4
+	tree.scale = Vector3.ONE * 0.16 if sapling else Vector3.ONE
 	tree.collision_mask = 0
 	tree.name = "Tree"
 	tree.position = Vector3(coords.x, 0.0, coords.y)
@@ -153,7 +163,30 @@ func _add_tree(parent_node: Node3D, coords: Vector2) -> void:
 	crown_collision.shape = crown_shape
 	crown_collision.position.y = 3.35
 	tree.add_child(crown_collision)
-	navigation.block_circle(coords, 1.6)
+
+	if sapling:
+		var growth := create_tween()
+		growth.tween_property(tree, "scale", Vector3.ONE, TREE_GROW_SECONDS)
+		growth.tween_callback(_finish_sapling_growth.bind(tree))
+	else:
+		navigation.block_circle(coords, 1.6)
+	return tree
+
+
+func _finish_sapling_growth(sapling: StaticBody3D) -> void:
+	if not is_instance_valid(sapling) or not sapling.is_sapling:
+		return
+	# Nie wstawiaj nowej kolizji na stojacej tam jednostce.
+	for worker in workers:
+		if _ground_distance(worker.global_position, sapling.global_position) < 2.1:
+			get_tree().create_timer(2.5).timeout.connect(_finish_sapling_growth.bind(sapling))
+			return
+	sapling.scale = Vector3.ONE
+	sapling.is_sapling = false
+	sapling.remaining = 200
+	sapling.collision_layer = 4
+	var point: Vector3 = sapling.global_position
+	navigation.block_circle(Vector2(point.x, point.z), sapling.clearance_radius)
 
 
 func _add_deposit(deposit_name: String, location: Vector3, tint: Color) -> void:
@@ -239,6 +272,8 @@ func _create_depot() -> void:
 func _on_resource_depleted(resource, clearance_radius: float) -> void:
 	var p: Vector3 = resource.global_position
 	navigation.unblock_circle(Vector2(p.x, p.z), clearance_radius)
+	# Martwe drzewa / puste zloza nie musza zostawac w drzewie sceny.
+	resource.queue_free()
 
 
 func _create_workers() -> void:
@@ -324,6 +359,11 @@ func _create_hud() -> void:
 	train_button.pressed.connect(_train_worker)
 	actions.add_child(train_button)
 
+	forester_button = Button.new()
+	forester_button.text = "Lesniczowka (L): 30 drewna + 10 kamienia"
+	forester_button.pressed.connect(_toggle_forester_mode)
+	actions.add_child(forester_button)
+
 	status_label = Label.new()
 	status_label.name = "GameplayStatus"
 	status_label.position = Vector2(16, 124)
@@ -351,9 +391,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_T:
 			_train_worker()
 			return
-		if event.keycode == KEY_ESCAPE and build_mode:
+		if event.keycode == KEY_L:
+			_toggle_forester_mode()
+			return
+		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode):
 			build_mode = false
-			_set_status("Anulowano budowe ratusza.")
+			forester_build_mode = false
+			_set_status("Anulowano budowe.")
 			return
 
 	if event is InputEventMouseMotion and mouse_down:
@@ -368,6 +412,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
+		if forester_build_mode:
+			if event.pressed:
+				_try_place_forester(event.position)
+			return
 		if build_mode:
 			if event.pressed:
 				_try_place_town_hall(event.position)
@@ -386,9 +434,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_dragging = false
 
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		if build_mode:
+		if build_mode or forester_build_mode:
 			build_mode = false
-			_set_status("Anulowano budowe ratusza.")
+			forester_build_mode = false
+			_set_status("Anulowano budowe.")
 		else:
 			_command_move_selected(event.position)
 
@@ -404,6 +453,8 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 	var building_hit := _raycast(screen_position, 8)
 	if building_hit.has("collider") and building_hit["collider"] == town_hall:
 		_set_status("Ratusz: nacisnij T lub przycisk Robotnik, aby rozpoczac szkolenie.")
+	elif building_hit.has("collider") and building_hit["collider"] in foresters:
+		_set_status("Lesniczowka automatycznie sadzi drzewa w poblizu.")
 
 
 func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
@@ -480,6 +531,8 @@ func _create_training_timer() -> void:
 
 
 func _toggle_build_mode() -> void:
+	if forester_build_mode:
+		forester_build_mode = false
 	if town_hall != null:
 		_set_status("Ratusz juz istnieje. Mozesz produkowac robotnikow.")
 		return
@@ -529,11 +582,127 @@ func _is_build_site_clear(site: Vector3) -> bool:
 	for worker in workers:
 		if _ground_distance(site, worker.global_position) < TOWN_HALL_RADIUS + 0.5:
 			return false
+	for hut in foresters:
+		if _ground_distance(site, hut.global_position) < TOWN_HALL_RADIUS + FORESTER_RADIUS + 0.7:
+			return false
 	return true
 
 
 func _ground_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
+
+
+func _toggle_forester_mode() -> void:
+	if build_mode:
+		build_mode = false
+	if forester_build_mode:
+		forester_build_mode = false
+		_set_status("Anulowano budowe lesniczowki.")
+		return
+	if foresters.size() >= MAX_FORESTERS:
+		_set_status("Limit lesniczowek na mapie: %d." % MAX_FORESTERS)
+		return
+	if not _can_afford(FORESTER_COST):
+		_set_status("Brakuje surowcow: lesniczowka kosztuje 30 drewna i 10 kamienia.")
+		return
+	forester_build_mode = true
+	_set_status("LPM: wybierz miejsce na lesniczowke. Esc lub PPM: anuluj.")
+
+
+func _try_place_forester(screen_position: Vector2) -> void:
+	var hit := _raycast(screen_position, 1)
+	if hit.is_empty():
+		_set_status("Kliknij wolny teren na mapie.")
+		return
+	var location: Vector3 = hit["position"]
+	var site := Vector3(roundf(location.x), 0.0, roundf(location.z))
+	if not _is_forester_site_clear(site):
+		_set_status("Brak miejsca na lesniczowke. Wybierz inne miejsce.")
+		return
+	if not _spend_resources(FORESTER_COST):
+		forester_build_mode = false
+		_set_status("Brakuje surowcow do budowy.")
+		return
+	var hut = FORESTER_SCRIPT.new()
+	hut.position = site
+	hut.plant_requested.connect(_on_forester_plant_request)
+	add_child(hut)
+	foresters.append(hut)
+	navigation.block_circle(Vector2(site.x, site.z), FORESTER_RADIUS)
+	forester_build_mode = false
+	_set_status("Lesniczowka gotowa! Co 8 s szuka miejsca na sadzonke.")
+	_update_action_buttons()
+
+
+func _is_forester_site_clear(site: Vector3) -> bool:
+	if absf(site.x) > 42.0 or absf(site.z) > 42.0:
+		return false
+	if not navigation.is_circle_walkable(Vector2(site.x, site.z), FORESTER_RADIUS):
+		return false
+	if _ground_distance(site, DEPOT_POSITION) < FORESTER_RADIUS + DEPOT_BLOCK_RADIUS + 1.0:
+		return false
+	if town_hall != null and _ground_distance(site, town_hall.global_position) < FORESTER_RADIUS + TOWN_HALL_RADIUS + 1.0:
+		return false
+	for hut in foresters:
+		if _ground_distance(site, hut.global_position) < FORESTER_RADIUS * 2.0 + 1.0:
+			return false
+	for source in get_tree().get_nodes_in_group("resource_nodes"):
+		if (source.remaining > 0 or source.is_sapling) and _ground_distance(site, source.global_position) < FORESTER_RADIUS + source.clearance_radius + 1.0:
+			return false
+	for worker in workers:
+		if _ground_distance(site, worker.global_position) < FORESTER_RADIUS + 0.6:
+			return false
+	return true
+
+
+func _on_forester_plant_request(hut: StaticBody3D) -> void:
+	if not is_instance_valid(hut):
+		return
+	var occupied_trees: int = 0
+	for source in get_tree().get_nodes_in_group("resource_nodes"):
+		if source.resource_type == "wood" and (source.remaining > 0 or source.is_sapling):
+			if _ground_distance(source.global_position, hut.global_position) <= 17.0:
+				occupied_trees += 1
+	if occupied_trees >= 12:
+		return
+
+	var rings: Array[float] = [6.0, 8.0, 10.0, 12.0, 14.0, 16.0]
+	for attempt in range(48):
+		var angle: float = TAU * float((attempt * 7 + hut.plant_attempts * 11) % 48) / 48.0
+		var distance: float = rings[(attempt + hut.plant_attempts) % rings.size()]
+		var planting_site := Vector2(
+			roundf(hut.global_position.x + cos(angle) * distance),
+			roundf(hut.global_position.z + sin(angle) * distance)
+		)
+		if _is_tree_planting_site_clear(planting_site, hut):
+			var forest: Node3D = get_node("Forest")
+			_add_tree(forest, planting_site, true)
+			return
+
+
+func _is_tree_planting_site_clear(spot: Vector2, hut: StaticBody3D) -> bool:
+	var location := Vector3(spot.x, 0.0, spot.y)
+	if absf(spot.x) > 45.0 or absf(spot.y) > 45.0:
+		return false
+	if _ground_distance(location, hut.global_position) > 17.0:
+		return false
+	if not navigation.is_circle_walkable(spot, 1.8):
+		return false
+	if _ground_distance(location, DEPOT_POSITION) < DEPOT_BLOCK_RADIUS + 2.8:
+		return false
+	if town_hall != null and _ground_distance(location, town_hall.global_position) < TOWN_HALL_RADIUS + 2.8:
+		return false
+	for house in foresters:
+		if _ground_distance(location, house.global_position) < FORESTER_RADIUS + 2.8:
+			return false
+	for source in get_tree().get_nodes_in_group("resource_nodes"):
+		if source.remaining > 0 or source.is_sapling:
+			if _ground_distance(location, source.global_position) < source.clearance_radius + 2.4:
+				return false
+	for worker in workers:
+		if _ground_distance(location, worker.global_position) < 1.8:
+			return false
+	return true
 
 
 func _train_worker() -> void:
@@ -609,6 +778,8 @@ func _update_action_buttons() -> void:
 		build_button.disabled = town_hall != null
 	if train_button != null:
 		train_button.disabled = training_in_progress or workers.size() >= MAX_WORKERS
+	if forester_button != null:
+		forester_button.disabled = foresters.size() >= MAX_FORESTERS
 
 
 func _on_resource_delivered(resource_type: String, amount: int) -> void:
