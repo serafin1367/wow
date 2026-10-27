@@ -57,6 +57,16 @@ jobs:
             echo "Conveyor integration test failed."
             exit 1
           fi
+      - name: Test manual conveyor waypoints, ports and zero-cost preview
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/conveyor_manual_smoke.gd 2>&1 | tee /tmp/wow-manual-belts.log
+          grep -F 'MANUAL BELT SMOKE OK' /tmp/wow-manual-belts.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|MANUAL BELT TEST:' /tmp/wow-manual-belts.log; then
+            echo "Manual conveyor geometry / route test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
