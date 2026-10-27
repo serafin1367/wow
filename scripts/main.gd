@@ -10,6 +10,7 @@ const TOWN_HALL_SCRIPT = preload("res://scripts/town_hall.gd")
 const FORESTER_SCRIPT = preload("res://scripts/forester_hut.gd")
 const LANDER_SCRIPT = preload("res://scripts/colony_lander.gd")
 const CHARGER_SCRIPT = preload("res://scripts/charging_pad.gd")
+const HUD_SCRIPT = preload("res://scripts/colony_hud.gd")
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
 const FORESTER_COST: Dictionary = {"wood": 30, "stone": 10}
@@ -32,11 +33,6 @@ var mouse_down: bool = false
 var is_dragging: bool = false
 var drag_start: Vector2 = Vector2.ZERO
 var resource_totals: Dictionary = {"wood": 0, "gold": 0, "stone": 0}
-var resource_label: Label
-var status_label: Label
-var build_button: Button
-var train_button: Button
-var forester_button: Button
 var forester_build_mode: bool = false
 var foresters: Array = []
 var build_mode: bool = false
@@ -45,9 +41,9 @@ var training_timer: Timer
 var training_in_progress: bool = false
 var landing_rocket = null
 var charging_pad = null
-var unit_status_label: Label
-var energy_label: Label
 var hud_elapsed: float = 0.0
+var hud = null
+var selected_structure = null
 
 
 func _ready() -> void:
@@ -375,112 +371,64 @@ func _create_camera() -> void:
 
 
 func _create_hud() -> void:
-	var ui := CanvasLayer.new()
-	ui.name = "HUD"
-	add_child(ui)
-	var hint := Label.new()
-	hint.name = "Controls"
-	hint.text = "WOW 0.2 | LPM: wybor | PPM: ruch / zadanie / naprawa | C: laduj | B: ratusz | L: lesniczowka"
-	hint.position = Vector2(16, 14)
-	hint.add_theme_font_size_override("font_size", 16)
-	hint.add_theme_color_override("font_color", Color.WHITE)
-	hint.add_theme_color_override("font_shadow_color", Color.BLACK)
-	hint.add_theme_constant_override("shadow_offset_x", 2)
-	hint.add_theme_constant_override("shadow_offset_y", 2)
-	ui.add_child(hint)
-
-	resource_label = Label.new()
-	resource_label.name = "ResourceCounters"
-	resource_label.position = Vector2(16, 43)
-	resource_label.add_theme_font_size_override("font_size", 22)
-	resource_label.add_theme_color_override("font_color", Color(1.0, 0.96, 0.80))
-	resource_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	resource_label.add_theme_constant_override("shadow_offset_x", 2)
-	resource_label.add_theme_constant_override("shadow_offset_y", 2)
-	ui.add_child(resource_label)
-	_update_resource_hud()
-
-	var actions := HBoxContainer.new()
-	actions.name = "EconomyActions"
-	actions.position = Vector2(16, 82)
-	actions.add_theme_constant_override("separation", 10)
-	ui.add_child(actions)
-
-	build_button = Button.new()
-	build_button.text = "Centrum (B): 40 drewna + 20 kamienia"
-	build_button.pressed.connect(_toggle_build_mode)
-	actions.add_child(build_button)
-
-	train_button = Button.new()
-	train_button.text = "Robotnik (T): 10 drewna + 20 zlota"
-	train_button.pressed.connect(_train_worker)
-	actions.add_child(train_button)
-
-	forester_button = Button.new()
-	forester_button.text = "Rekultywacja (L): 30 drewna + 10 kamienia"
-	forester_button.pressed.connect(_toggle_forester_mode)
-	actions.add_child(forester_button)
-
-	status_label = Label.new()
-	status_label.name = "GameplayStatus"
-	status_label.position = Vector2(16, 124)
-	status_label.add_theme_font_size_override("font_size", 17)
-	status_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.77))
-	status_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	status_label.add_theme_constant_override("shadow_offset_x", 2)
-	status_label.add_theme_constant_override("shadow_offset_y", 2)
-	ui.add_child(status_label)
-	_set_status("Trzy roboty wylatuja z rakiety. Technik: PPM na statku = naprawa.")
-	_update_action_buttons()
-
-	energy_label = Label.new()
-	energy_label.name = "SolarPowerStatus"
-	energy_label.position = Vector2(16, 158)
-	energy_label.add_theme_font_size_override("font_size", 17)
-	energy_label.add_theme_color_override("font_color", Color(0.35, 0.95, 1.0))
-	ui.add_child(energy_label)
-
-	var panel := PanelContainer.new()
-	panel.name = "SelectedRobotPanel"
-	panel.position = Vector2(16, 196)
-	panel.custom_minimum_size = Vector2(305, 80)
-	ui.add_child(panel)
-	unit_status_label = Label.new()
-	unit_status_label.name = "RobotInfo"
-	unit_status_label.add_theme_font_size_override("font_size", 17)
-	panel.add_child(unit_status_label)
-	_update_colony_hud()
+	hud = HUD_SCRIPT.new()
+	hud.name = "ColonyHUD"
+	hud.build_center_requested.connect(_toggle_build_mode)
+	hud.build_forester_requested.connect(_toggle_forester_mode)
+	hud.train_robot_requested.connect(_train_worker)
+	hud.charge_requested.connect(_charge_selected)
+	add_child(hud)
 
 	selection_box = SELECTION_BOX_SCRIPT.new()
 	selection_box.name = "SelectionBox"
-	selection_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	selection_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(selection_box)
+	hud.add_selection_overlay(selection_box)
+
+	_set_status("Trzy roboty opuscily rakiete. Zacznij od wydobycia i naprawy paneli.")
+	_update_action_buttons()
+	_update_resource_hud()
+	_update_colony_hud()
 
 
 func _process(delta: float) -> void:
 	hud_elapsed += delta
-	if hud_elapsed >= 0.2:
+	if hud_elapsed >= 0.25:
 		hud_elapsed = 0.0
 		_update_colony_hud()
 
 
 func _update_colony_hud() -> void:
-	if energy_label != null and landing_rocket != null:
-		energy_label.text = "ENERGIA SLONECZNA: %.1f kW | Ladowarka: %s" % [
-			landing_rocket.solar_output(),
-			"AKTYWNA" if charging_pad.can_charge() else "NIEDOSTEPNA"
-		]
-	if unit_status_label != null:
-		if selected_workers.size() == 1:
-			var worker = selected_workers[0]
-			unit_status_label.text = "  %s | %s\\n  Akumulator: %d%% | Ladunek: %d\\n  [C] Jedz do ladowarki  " % [
-				worker.role_name(), worker.status_text(), roundi(worker.energy), worker.carried_amount
-			]
-		elif selected_workers.size() > 1:
-			unit_status_label.text = "  Wybrano %d robotow\\n  [C] Wyslij do ladowania  " % selected_workers.size()
+	if hud == null:
+		return
+	if landing_rocket != null and charging_pad != null:
+		hud.set_power(landing_rocket.solar_output(), charging_pad.can_charge())
+
+	if selected_workers.size() == 1:
+		var robot = selected_workers[0]
+		hud.set_robot(robot.role_name(), robot.status_text(), robot.energy, robot.carried_amount)
+	elif selected_workers.size() > 1:
+		hud.set_robot_group(selected_workers.size())
+	elif is_instance_valid(selected_structure) and selected_structure != null:
+		if selected_structure == landing_rocket:
+			hud.set_structure("RAKIETA KOLONIJNA", "Produkcja PV: %.1f kW" % landing_rocket.solar_output(), landing_rocket.health)
+		elif selected_structure == charging_pad:
+			hud.set_structure("STACJA LADOWANIA", "Moc: %s" % ("dostepna" if charging_pad.can_charge() else "brak"), charging_pad.health)
+		elif selected_structure == town_hall:
+			hud.set_structure("CENTRUM DOWODZENIA", "Produkcja robotow: klawisz T.")
+		elif selected_structure in foresters:
+			hud.set_structure("MODUL REKULTYWACJI", "Odnawianie drzew: cykl 8 sekund.")
 		else:
-			unit_status_label.text = "  LPM: wybierz robota\\n  PPM na statku: naprawa technikiem  "
+			hud.set_no_selection()
+	else:
+		hud.set_no_selection()
+
+
+func _charge_selected() -> void:
+	if selected_workers.is_empty():
+		_set_status("Wybierz co najmniej jednego robota.")
+		return
+	for robot in selected_workers:
+		robot.command_charge()
+	_set_status("Rozkaz: wybrane roboty jada do stacji ladowania.")
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -495,9 +443,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_forester_mode()
 			return
 		if event.keycode == KEY_C:
-			for worker in selected_workers:
-				worker.command_charge()
-			_set_status("Rozkaz: roboty jada do stacji ladowania.")
+			_charge_selected()
 			return
 		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode):
 			build_mode = false
@@ -556,10 +502,18 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 		return
 
 	var building_hit := _raycast(screen_position, 8)
-	if building_hit.has("collider") and building_hit["collider"] == town_hall:
-		_set_status("Centrum: nacisnij T lub Robotnik, aby szkolic kolejnego gornika.")
-	elif building_hit.has("collider") and building_hit["collider"] in foresters:
-		_set_status("Modul rekultywacji automatycznie sadzi drzewa w poblizu.")
+	if building_hit.has("collider"):
+		var structure = building_hit["collider"]
+		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters:
+			selected_structure = structure
+			if structure == town_hall:
+				_set_status("Centrum: T szkoli kolejnego gornika.")
+			elif structure in foresters:
+				_set_status("Modul rekultywacji automatycznie sadzi nowe drzewa.")
+			elif structure == landing_rocket:
+				_set_status("Wybierz technika i kliknij PPM na rakiecie, aby ja naprawic.")
+			elif structure == charging_pad:
+				_set_status("Ladowarka: C wysyla zaznaczone roboty do ladowania.")
 
 
 func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
@@ -638,13 +592,17 @@ func _clear_selection() -> void:
 	for worker in selected_workers:
 		worker.set_selected(false)
 	selected_workers.clear()
+	selected_structure = null
+	_update_action_buttons()
 
 
 func _select_worker(worker: CharacterBody3D) -> void:
 	if worker in selected_workers:
 		return
 	selected_workers.append(worker)
+	selected_structure = null
 	worker.set_selected(true)
+	_update_action_buttons()
 
 
 func _create_training_timer() -> void:
@@ -907,17 +865,19 @@ func _refund_resources(cost: Dictionary) -> void:
 
 
 func _set_status(message: String) -> void:
-	if status_label != null:
-		status_label.text = message
+	if hud != null:
+		hud.set_status(message)
 
 
 func _update_action_buttons() -> void:
-	if build_button != null:
-		build_button.disabled = town_hall != null
-	if train_button != null:
-		train_button.disabled = training_in_progress or workers.size() >= MAX_WORKERS
-	if forester_button != null:
-		forester_button.disabled = foresters.size() >= MAX_FORESTERS
+	if hud != null:
+		hud.set_action_availability(
+			town_hall != null,
+			workers.size() >= MAX_WORKERS,
+			training_in_progress,
+			foresters.size() >= MAX_FORESTERS,
+			not selected_workers.is_empty()
+		)
 
 
 func _on_resource_delivered(resource_type: String, amount: int) -> void:
@@ -928,15 +888,15 @@ func _on_resource_delivered(resource_type: String, amount: int) -> void:
 
 
 func _update_resource_hud() -> void:
-	if resource_label == null:
+	if hud == null:
 		return
-	resource_label.text = "Drewno: %d     Zloto: %d     Kamien: %d     Robotnicy: %d/%d" % [
+	hud.set_resources(
 		int(resource_totals["wood"]),
 		int(resource_totals["gold"]),
 		int(resource_totals["stone"]),
 		workers.size(),
 		MAX_WORKERS
-	]
+	)
 
 
 func _make_material(tint: Color) -> StandardMaterial3D:
