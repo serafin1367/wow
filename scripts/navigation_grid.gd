@@ -40,6 +40,24 @@ func _change_blocking(center: Vector2, radius: float, change: int) -> void:
 				grid.set_point_solid(cell, count > 0)
 
 
+func find_free_spawn_near(center: Vector3, sequence: int = 0) -> Vector3:
+	# Kandydaci sa poza promieniem blokowania ratusza (4.5 pola).
+	for radius in range(5, 12):
+		for i in range(16):
+			var angle := TAU * float((i + sequence * 3) % 16) / 16.0
+			var position := Vector3(
+				center.x + cos(angle) * float(radius),
+				0.0,
+				center.z + sin(angle) * float(radius)
+			)
+			var cell := _world_to_cell(position)
+			if abs(cell.x) > 47 or abs(cell.y) > 47:
+				continue
+			if not grid.is_point_solid(cell):
+				return Vector3(float(cell.x), 0.0, float(cell.y))
+	return Vector3(0.0, 0.0, 0.0)
+
+
 func find_path(origin: Vector3, target: Vector3) -> Array[Vector3]:
 	var from_id := _world_to_cell(origin)
 	var to_id := _nearest_walkable(_world_to_cell(target))
