@@ -141,6 +141,44 @@ func find_conveyor_route(source: Vector3, source_radius: float, target: Vector3,
 	return best
 
 
+func find_conveyor_route_via(source: Vector3, source_radius: float, target: Vector3, target_radius: float, waypoints: Array[Vector3]) -> Array[Vector3]:
+	if waypoints.is_empty():
+		return find_conveyor_route(source, source_radius, target, target_radius)
+	var first: Vector3 = waypoints[0]
+	var best_first: Array[Vector3] = []
+	for offset in [0.8, 1.5]:
+		for i in range(16):
+			var angle: float = TAU * float(i) / 16.0
+			var around := source + Vector3(cos(angle) * (source_radius + offset), 0, sin(angle) * (source_radius + offset))
+			var cell: Vector2i = _world_to_cell(around)
+			if grid.is_point_solid(cell):
+				continue
+			var possible: Array[Vector3] = find_path(Vector3(float(cell.x), 0, float(cell.y)), first)
+			if possible.is_empty():
+				continue
+			if best_first.is_empty() or possible.size() < best_first.size():
+				best_first = possible
+	if best_first.is_empty():
+		return []
+	var route: Array[Vector3] = best_first.duplicate()
+	for j in range(1, waypoints.size()):
+		var leg: Array[Vector3] = find_path(route[route.size() - 1], waypoints[j])
+		if leg.is_empty():
+			return []
+		_append_unique(route, leg)
+	var last_leg: Array[Vector3] = find_access_path(route[route.size() - 1], target, target_radius + 0.65)
+	if last_leg.is_empty():
+		return []
+	_append_unique(route, last_leg)
+	return route
+
+
+func _append_unique(result: Array[Vector3], points: Array[Vector3]) -> void:
+	for p in points:
+		if result.is_empty() or result[result.size() - 1].distance_squared_to(p) > 0.01:
+			result.append(p)
+
+
 func find_path(origin: Vector3, target: Vector3) -> Array[Vector3]:
 	var from_id := _world_to_cell(origin)
 	var to_id := _nearest_walkable(_world_to_cell(target))
