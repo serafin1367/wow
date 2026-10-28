@@ -20,6 +20,7 @@ const CONVEYOR_SCRIPT = preload("res://scripts/conveyor_link.gd")
 const SOLAR_SCRIPT = preload("res://scripts/solar_array.gd")
 const BATTERY_SCRIPT = preload("res://scripts/battery_bank.gd")
 const POWER_CABLE_SCRIPT = preload("res://scripts/power_cable.gd")
+const BUILD_PREVIEW_SCRIPT = preload("res://scripts/build_placement_preview.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
@@ -83,6 +84,8 @@ var energy_build_kind: String = ""
 var grid_generation_kw: float = 0.0
 var grid_consumption_kw: float = 0.0
 var battery_draw_kw: float = 0.0
+var build_preview = null
+var preview_elapsed: float = 0.0
 
 
 func _ready() -> void:
@@ -95,6 +98,7 @@ func _ready() -> void:
 	_create_workers()
 	_create_camera()
 	_create_hud()
+	_create_build_preview()
 	_create_training_timer()
 
 
@@ -395,6 +399,164 @@ func _cycle_planet() -> void:
 	if hud != null:
 		hud.set_planet(planet_name)
 	_set_status("Podglad biomu: %s. To zmiana wygladu mapy, bez teleportacji." % planet_name)
+
+
+func _create_build_preview() -> void:
+	build_preview = BUILD_PREVIEW_SCRIPT.new()
+	add_child(build_preview)
+
+
+func _active_build_kind() -> String:
+	if energy_build_kind != "":
+		return energy_build_kind
+	if mine_build_mode:
+		return "mine"
+	if smelter_build_mode:
+		return "smelter"
+	if build_mode:
+		return "center"
+	if forester_build_mode:
+		return "forester"
+	return ""
+
+
+func _build_radius(kind: String) -> float:
+	match kind:
+		"mine":
+			return MINE_SCRIPT.CLEARANCE_RADIUS
+		"smelter":
+			return SMELTER_RADIUS
+		"center":
+			return TOWN_HALL_RADIUS
+		"forester":
+			return FORESTER_RADIUS
+		"solar":
+			return SOLAR_SCRIPT.CLEARANCE_RADIUS
+		"battery":
+			return BATTERY_SCRIPT.CLEARANCE_RADIUS
+	return 0.0
+
+
+func _mine_resource():
+	var resource = get_node_or_null("IronOreDeposit")
+	if not is_instance_valid(resource) or resource == null or resource.remaining <= 0 or factory_mine != null:
+		return null
+	return resource
+
+
+func _build_site_at_mouse(screen_position: Vector2, kind: String) -> Dictionary:
+	var ground_hit: Dictionary = _raycast(screen_position, 1)
+	if ground_hit.is_empty():
+		return {}
+	var point: Vector3 = ground_hit["position"]
+	var site := Vector3(roundf(point.x), 0.0, roundf(point.z))
+	if kind == "mine":
+		var source = _mine_resource()
+		if source == null:
+			return {}
+		var resource_hit: Dictionary = _raycast(screen_position, 4)
+		if resource_hit.has("collider") and resource_hit["collider"] == source:
+			site = source.global_position
+		elif _ground_distance(point, source.global_position) <= source.clearance_radius:
+			site = source.global_position
+	return {"site": site}
+
+
+func _build_grid_cell_free(cell: Vector2i, kind: String = "") -> bool:
+	# Ta sama siatka przeszkod, z ktorej korzystaja roboty. Zloze zelaza
+	# moze zostac zajete WYLACZNIE przez kopalnie.
+	if abs(cell.x) > 43 or abs(cell.y) > 43:
+		return false
+	var count: int = int(navigation.obstacle_counts.get(cell, 0))
+	if kind == "mine":
+		var source = _mine_resource()
+		if source != null:
+			var coords := Vector2(float(cell.x), float(cell.y))
+			var ore_center := Vector2(source.global_position.x, source.global_position.z)
+			if coords.distance_squared_to(ore_center) <= source.clearance_radius * source.clearance_radius:
+				count -= 1
+	return count <= 0
+
+
+func _can_place_structure_at(site: Vector3, kind: String) -> bool:
+	var radius: float = _build_radius(kind)
+	if radius <= 0.0:
+		return false
+	if absf(site.x) + radius > 43.0 or absf(site.z) + radius > 43.0:
+		return false
+	if kind == "mine":
+		var source = _mine_resource()
+		if source == null or _ground_distance(site, source.global_position) > 0.1:
+			return false
+	if kind == "smelter" and factory_smelter != null:
+		return false
+	if kind == "center" and town_hall != null:
+		return false
+	if kind == "forester" and foresters.size() >= MAX_FORESTERS:
+		return false
+	if kind == "solar" and solar_arrays.size() >= MAX_SOLAR_ARRAYS:
+		return false
+	if kind == "battery" and battery_banks.size() >= MAX_BATTERIES:
+		return false
+	# Badamy caly obrys budynku, nie tylko pole pod kursorem.
+	for x in range(floori(site.x - radius), ceili(site.x + radius) + 1):
+		for z in range(floori(site.z - radius), ceili(site.z + radius) + 1):
+			if Vector2(float(x), float(z)).distance_squared_to(Vector2(site.x, site.z)) <= radius * radius:
+				if not _build_grid_cell_free(Vector2i(x, z), kind):
+					return false
+	# Dodatkowo sprawdzamy realne polozenie budynkow i zrodel
+	# (okragi na siatce A* sa dyskretne, wiec moglyby zostawic szczeliny).
+	var reserved: Array[Dictionary] = [
+		{"node": landing_rocket, "radius": 4.2},
+		{"node": charging_pad, "radius": CHARGER_SCRIPT.CLEARANCE_RADIUS},
+		{"node": get_node_or_null("Stockpile"), "radius": DEPOT_BLOCK_RADIUS},
+		{"node": town_hall, "radius": TOWN_HALL_RADIUS},
+		{"node": factory_mine, "radius": MINE_SCRIPT.CLEARANCE_RADIUS},
+		{"node": factory_smelter, "radius": SMELTER_RADIUS}
+	]
+	for hut in foresters:
+		reserved.append({"node": hut, "radius": FORESTER_RADIUS})
+	for solar in solar_arrays:
+		reserved.append({"node": solar, "radius": SOLAR_SCRIPT.CLEARANCE_RADIUS})
+	for bank in battery_banks:
+		reserved.append({"node": bank, "radius": BATTERY_SCRIPT.CLEARANCE_RADIUS})
+	for resource in get_tree().get_nodes_in_group("resource_nodes"):
+		if kind == "mine" and resource == _mine_resource():
+			continue
+		if resource.remaining > 0 or resource.is_sapling:
+			reserved.append({"node": resource, "radius": resource.clearance_radius})
+	for occupied in reserved:
+		var node = occupied["node"]
+		if is_instance_valid(node) and node != null:
+			if _ground_distance(site, node.global_position) < radius + float(occupied["radius"]) + 0.25:
+				return false
+	for worker in workers:
+		if is_instance_valid(worker) and _ground_distance(site, worker.global_position) < radius + 1.0:
+			return false
+	return true
+
+
+func _update_build_preview(delta: float) -> void:
+	if build_preview == null:
+		return
+	var kind: String = _active_build_kind()
+	if kind == "":
+		build_preview.clear()
+		preview_elapsed = 0.0
+		return
+	preview_elapsed += delta
+	if preview_elapsed < 0.12:
+		return
+	preview_elapsed = 0.0
+	var hit: Dictionary = _build_site_at_mouse(get_viewport().get_mouse_position(), kind)
+	if hit.is_empty():
+		build_preview.clear()
+		return
+	var site: Vector3 = hit["site"]
+	build_preview.update_area(
+		site, _build_radius(kind), _can_place_structure_at(site, kind),
+		Callable(self, "_build_grid_cell_free").bind(kind)
+	)
 
 
 func _cancel_build_modes() -> void:
@@ -897,6 +1059,7 @@ func _create_hud() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_build_preview(delta)
 	hud_elapsed += delta
 	if hud_elapsed >= 0.25:
 		var elapsed_energy: float = hud_elapsed
