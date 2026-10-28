@@ -26,6 +26,8 @@ var resource_target = null
 var repair_target = null
 var preferred_resource_type: String = ""
 var navigation_grid = null
+var road_network = null
+const ROAD_SPEED_MULTIPLIER: float = 1.25
 var charging_station = null
 var depot_position: Vector3 = Vector3.ZERO
 var energy: float = BATTERY_MAX
@@ -141,7 +143,12 @@ func _physics_process(delta: float) -> void:
 
 	var difference := waypoints[next_waypoint] - global_position
 	difference.y = 0.0
-	velocity = difference.normalized() * minf(move_speed, difference.length() / maxf(delta, 0.001))
+	var current_speed: float = move_speed
+	if is_instance_valid(road_network) and road_network != null:
+		var current_cell := Vector2i(roundi(global_position.x), roundi(global_position.z))
+		if road_network.has_cell(current_cell):
+			current_speed *= ROAD_SPEED_MULTIPLIER
+	velocity = difference.normalized() * minf(current_speed, difference.length() / maxf(delta, 0.001))
 	move_and_slide()
 	if velocity.length_squared() > 0.05:
 		var visual := get_node_or_null("RobotVisual") as Node3D
