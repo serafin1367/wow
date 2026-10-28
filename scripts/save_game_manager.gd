@@ -90,6 +90,7 @@ func to_dict(game: Node3D) -> Dictionary:
 		"belts": belts,
 		"roads": game.roads.to_dict(),
 		"blueprints": game.blueprints.to_dict(),
+		"logistics": game.logistics_manager.to_dict(),
 		"lander": game.landing_rocket.to_dict(),
 		"charger": game.charging_pad.to_dict(),
 		"training": {"active": game.training_in_progress,
@@ -156,6 +157,11 @@ func validate(data: Variant) -> bool:
 		if not (row.get("position", null) is Array) or row["position"].size() != 3:
 			return false
 		if int(row.get("cargo_amount", -1)) < 0:
+			return false
+	if data.has("logistics"):
+		if not (data["logistics"] is Dictionary) or not (data["logistics"].get("jobs", null) is Array):
+			return false
+		if data["logistics"]["jobs"].size() > 16:
 			return false
 	for belt in data["belts"]:
 		if not (belt is Dictionary) or not belt.get("mode", "") in ["ore", "metal"]:
@@ -326,6 +332,27 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 	for i in range(data["robots"].size()):
 		game.workers[i].restore_links(data["robots"][i], resource_lookup,
 			game.navigation, game.charging_pad, game.DEPOT_POSITION)
+
+	# Wszystkie obiekty juz istnieja: mozna teraz rozwiazac relacje
+	# zlecen po stabilnych identyfikatorach, bez bezposredniej serializacji Node.
+	resource_lookup["stockpile"] = game.get_node("Stockpile")
+	for index in range(game.logistics_depots.size()):
+		var hub = game.logistics_depots[index]
+		resource_lookup[str(hub.get_meta("save_id", "building:depot:%d" % index))] = hub
+	game.logistics_manager.from_dict(data.get("logistics", {}), resource_lookup)
+	for robot in game.workers:
+		if robot.logistics_job_id != "":
+			var assigned: Dictionary = game.logistics_manager.get_job(robot.logistics_job_id)
+			if assigned.is_empty():
+				robot.logistics_job_id = ""
+				robot.state = robot.WorkState.IDLE
+				continue
+			robot.logistics_manager = game.logistics_manager
+			robot.logistics_source = resource_lookup.get(assigned["source_id"])
+			robot.logistics_destination = resource_lookup.get(assigned["destination_id"])
+			robot.logistics_type = str(assigned["resource_type"])
+			robot.logistics_amount = int(assigned["amount"])
+			robot.logistics_sink = bool(assigned["sink"])
 
 	game.training_in_progress = bool(data.get("training", {}).get("active", false))
 	if game.training_in_progress:
