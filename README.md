@@ -4,24 +4,52 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
-## WOW 0.15 — wskazniki produkcji (pierwszy krok)
+## WOW 0.15 — centrum zarzadzania produkcja
 
-Wersja rozwojowa 0.15 dodaje statystyki niezalezne od magazynu:
-kopalnia i huta maja **trwale liczniki** wyprodukowanego materialu.
-Dzieki temu pobranie rudy przez robota nie zmniejsza wskaznika
-produkcji. `scripts/production_monitor.gd` zbiera probki co 2 s,
-przechowuje ostatnich 30 probek (do 60 s) i liczy produkcje/min.
+**V / przycisk V PRODUKCJA:** otwiera panel, w ktorym gracz moze
+analizowac biezaca sytuacje gospodarcza calej kolonii:
+produkcje rudy i metalu na minute, zuzycie rudy przez hute na minute,
+stan zasobow w magazynie glownym, obciazenie floty robotow
+(zajete / ladowanie / wolne) i liczbe zlecen logistycznych.
 
-Na gornej belce widoczne sa **RUDA/min** i **METAL/min**.
-Kliknij kopalnie lub hute, aby zobaczyc recepture, we/wy,
-stan buforow, zapotrzebowanie na moc, postep cyklu i komunikat
-o problemie (brak energii, rudy/zloza, pelny bufor).
-`Ctrl+S` / `Ctrl+O` zachowuje wskazania i liczniki produkcji.
+**Kopalnia i huta** maja osobne karty z receptura, zapotrzebowaniem
+na moc, zapełnieniem buforow i procentowym postepem cyklu.
+Kazda maszyna ma niezalezne sterowanie:
+- `PAUZA` / `WZNOW` zatrzymuje/wznawia produkcje (bez utraty postepu);
+  maszyna wstrzymana nie pobiera energii.
+- `Cykle` i `USTAW` ustalaja limit: `-1` oznacza produkcje
+  ciagla, `0` zatrzymuje po aktualnym stanie, wartosci dodatnie
+  odliczaja liczbe przyszlych cykli. Po zakonczeniu limitu
+  maszyna automatycznie sie zatrzymuje.
+- `Priorytet zasilania` 0–200 i `USTAW` okreslaja kolejnosc
+  przydzielania ograniczonej energii pomiedzy maszynami.
+  Domyslnie kopalnia ma 100, huta 90.
 
-Test jednostkowy `tests/production_monitor_smoke.gd` sprawdza tempo,
-niezaleznosc od transportu, diagnoze przestojow i zapis licznika.
-Pelny widok zuzycia/min, kolejki receptur, alarmy z przejsciem
-do maszyny i przyciski pauzy sa planowane w dalszej czesci 0.15.
+**ALARMY:** panel zglasza m.in. brak zasilania, brak rudy,
+wyczerpane zloze, pelny bufor i niedostepny transport rudy
+(gdy nie ma transportowca ani tasmy). Przycisk `POKAZ` przy
+maszynie/alarmie wybiera wlasciwy budynek i centruje na nim kamere.
+
+**Zapis:** `Ctrl+S` / `Ctrl+O` utrwala pauze, liczbe cykli,
+priorytety maszyn, biezace bufory, laczne liczniki produkcji
+i probki statystyczne. Wskazniki produkcji/min sa obliczane
+z roznic licznikow w ostatnim oknie pomiarowym (~60 s),
+a nie z ubytku/zapasu w magazynie.
+
+Implementacja: `scripts/production_panel.gd`,
+`scripts/production_monitor.gd`, `scripts/automated_mine.gd`,
+`scripts/automated_smelter.gd`. Regresje automatyczne:
+`tests/production_monitor_smoke.gd`,
+`tests/production_console_smoke.gd`,
+`tests/production_layout_smoke.gd`.
+Test ostatni sprawdza uklad okna produkcji przy 720p, 1080p
+i zmniejszonej rozdzielczosci.
+
+**Ograniczenia:** obecna kolejka maszyny to licznik zamowionych cykli
+dla jej jedynej receptury, a nie lista wielu receptur lub zamowien FIFO.
+Zmiana receptury i wielozadaniowe planowanie trafia do WOW 0.16.
+Konieczny jest jeszcze reczny przeglad czytelnosci calego HUD
+na Windows w roznorodnych proporcjach ekranu.
 
 ## WOW 0.14 — zarzadzanie logistyka i magazynami posrednimi
 
