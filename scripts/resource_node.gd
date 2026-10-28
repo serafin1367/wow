@@ -21,3 +21,19 @@ func harvest(requested: int) -> int:
 		visible = false
 		depleted.emit(self, clearance_radius)
 	return harvested
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "resource_type": resource_type,
+		"position": [global_position.x, global_position.y, global_position.z],
+		"remaining": remaining, "clearance_radius": clearance_radius,
+		"is_sapling": is_sapling, "visible": visible}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	remaining = maxi(0, int(data.get("remaining", remaining)))
+	is_sapling = bool(data.get("is_sapling", is_sapling))
+	clearance_radius = float(data.get("clearance_radius", clearance_radius))
+	visible = bool(data.get("visible", visible))
+	collision_layer = 0 if is_sapling or remaining <= 0 or not visible else 4
