@@ -17,10 +17,14 @@ na moc, zapełnieniem buforow i procentowym postepem cyklu.
 Kazda maszyna ma niezalezne sterowanie:
 - `PAUZA` / `WZNOW` zatrzymuje/wznawia produkcje (bez utraty postepu);
   maszyna wstrzymana nie pobiera energii.
-- `Cykle` i `USTAW` ustalaja limit: `-1` oznacza produkcje
+- `Cykle` i `USTAW` zastepuja aktualny plan. `-1` oznacza produkcje
   ciagla, `0` zatrzymuje po aktualnym stanie, wartosci dodatnie
-  odliczaja liczbe przyszlych cykli. Po zakonczeniu limitu
-  maszyna automatycznie sie zatrzymuje.
+  odliczaja liczbe przyszlych cykli.
+- `DODAJ` dopisuje partie od 1 do 1000 cykli do kolejki (maks. 16
+  oczekujacych zamowien). Po wykonaniu biezacej partii maszyna
+  automatycznie wybiera nastepne zamowienie o najwyzszym priorytecie.
+  Gdy maszyna pracuje bez limitu, pierwsze `DODAJ` zamienia prace
+  ciagla na okreslona partie. `USTAW` czysci pozostala kolejke.
 - `Priorytet zasilania` 0–200 i `USTAW` okreslaja kolejnosc
   przydzielania ograniczonej energii pomiedzy maszynami.
   Domyslnie kopalnia ma 100, huta 90.
@@ -41,13 +45,15 @@ Implementacja: `scripts/production_panel.gd`,
 `scripts/automated_smelter.gd`. Regresje automatyczne:
 `tests/production_monitor_smoke.gd`,
 `tests/production_console_smoke.gd`,
-`tests/production_layout_smoke.gd`.
+`tests/production_layout_smoke.gd`,
+`tests/production_queue_smoke.gd`.
 Test ostatni sprawdza uklad okna produkcji przy 720p, 1080p
 i zmniejszonej rozdzielczosci.
 
-**Ograniczenia:** obecna kolejka maszyny to licznik zamowionych cykli
-dla jej jedynej receptury, a nie lista wielu receptur lub zamowien FIFO.
-Zmiana receptury i wielozadaniowe planowanie trafia do WOW 0.16.
+**Ograniczenia:** kazda maszyna ma obecnie jedna recepture i liste
+partii o okreslonej liczbie cykli oraz priorytecie. Przelaczanie
+receptur i zaawansowana koordynacja wielu lancuchow produkcyjnych
+zostana dodane w WOW 0.16.
 Konieczny jest jeszcze reczny przeglad czytelnosci calego HUD
 na Windows w roznorodnych proporcjach ekranu.
 
