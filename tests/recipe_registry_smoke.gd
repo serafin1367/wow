@@ -3,6 +3,7 @@ extends SceneTree
 const REGISTRY = preload("res://scripts/recipe_registry.gd")
 const RECIPE = preload("res://scripts/production_recipe.gd")
 const SMELTER = preload("res://scripts/automated_smelter.gd")
+const INVENTORY = preload("res://scripts/inventory.gd")
 
 
 func _initialize() -> void:
@@ -33,8 +34,13 @@ func _run() -> void:
 		_fail("Zmieniono czas lub pobor mocy huty")
 		return
 	var mine = REGISTRY.recipes_for_machine("mine")
-	if mine.size() != 1 or mine[0].output_amount("iron_ore") != 4:
-		_fail("Brak danych receptury kopalni")
+	if mine.size() != 1 or mine[0].output_amount("iron_ore") != 4 or not mine[0].requires_external_source:
+		_fail("Brak definicji kopalni wymagajacej skonczonego zloza")
+		return
+	var unsourced_ore = INVENTORY.new("test:ore")
+	unsourced_ore.configure("iron_ore", 50)
+	if mine[0].process_once(null, unsourced_ore) or unsourced_ore.quantity("iron_ore") != 0:
+		_fail("Rejestr pozwala wytwarzac rude bez jej wydobywania ze zloza")
 		return
 	if REGISTRY.get_recipe("unknown") != null or not REGISTRY.recipes_for_machine("unknown").is_empty():
 		_fail("Rejestr przyjmuje nieznana recepture lub maszyne")
@@ -58,6 +64,13 @@ func _run() -> void:
 	invalid["outputs"] = {"metal": -1}
 	if RECIPE.from_dict(invalid) != null:
 		_fail("Receptura dopuszcza produkcje o ujemnym bilansie")
+		return
+	invalid = iron.to_dict()
+	invalid["inputs"] = {"iron_ore": 2}
+	invalid["outputs"] = {"iron_ore": 2}
+	var same_input_output = RECIPE.from_dict(invalid)
+	if same_input_output == null or same_input_output.output_amount("iron_ore") != 2:
+		_fail("Parser gubi wyjscie, gdy wejscie i wyjscie sa identyczne")
 		return
 
 	var smelter = SMELTER.new()
