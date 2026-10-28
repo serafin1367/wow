@@ -74,7 +74,12 @@ func _run_test() -> void:
 	var carried_before: int = worker.carried_amount
 	var state_before: Dictionary = manager.to_dict(game)
 	if not manager.validate(state_before):
-		_fail("Nieprawidlowy format JSON w pamieci")
+		var ids: Array = []
+		for category in ["resources", "structures", "robots", "belts"]:
+			for row in state_before[category]:
+				ids.append("%s:%s" % [category, row.get("save_id", "<missing>")])
+		_fail("Nieprawidlowy format: %s | planet=%s | counts=%s" % [
+			str(ids), str(state_before["planet"]), str(game.resource_totals)])
 		return
 	if not manager.save_file(game, TEST_FILE):
 		_fail("Nie mozna zapisac pliku testowego")
