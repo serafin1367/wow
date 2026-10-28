@@ -35,6 +35,8 @@ func to_dict(game: Node3D) -> Dictionary:
 		# Godot automatycznie zmienia nazwy rodzenstwa Tree na Tree2 / @...;
 		# logiczny typ zrodla nie moze zalezec od nazwy Node.
 		record["node_name"] = "Tree" if resource.resource_type == "wood" else resource.name
+		record["type_id"] = "resource:" + resource.resource_type
+		record["object_version"] = 1
 		resources.append(record)
 	# Zloze pod kopalnia nie nalezy juz do grupy resource_nodes.
 	var iron = game.get_node_or_null("IronOreDeposit")
@@ -42,6 +44,8 @@ func to_dict(game: Node3D) -> Dictionary:
 		_id(iron, "deposit:IronOreDeposit")
 		var hidden: Dictionary = iron.to_dict()
 		hidden["node_name"] = "IronOreDeposit"
+		hidden["type_id"] = "resource:iron_ore"
+		hidden["object_version"] = 1
 		resources.append(hidden)
 	var structures: Array = []
 	var groups: Dictionary = {
@@ -58,12 +62,17 @@ func to_dict(game: Node3D) -> Dictionary:
 			_id(node, "factory:%s" % kind if kind == "mine" or kind == "smelter" else "building:%s:%d" % [kind, i])
 			var state: Dictionary = node.to_dict()
 			state["kind"] = kind
+			state["type_id"] = "building:" + kind
+			state["object_version"] = 1
 			structures.append(state)
 	var robots: Array = []
 	for i in range(game.workers.size()):
 		var robot = game.workers[i]
 		_id(robot, "worker:%d" % i)
-		robots.append(robot.to_dict())
+		var robot_record: Dictionary = robot.to_dict()
+		robot_record["type_id"] = "worker:" + robot.robot_role
+		robot_record["object_version"] = 1
+		robots.append(robot_record)
 	var belts: Array = []
 	for conveyor in [game.ore_conveyor, game.metal_conveyor]:
 		if is_instance_valid(conveyor):
@@ -124,6 +133,10 @@ func validate(data: Variant) -> bool:
 			if record_id.is_empty() or seen_ids.has(record_id):
 				return false
 			seen_ids[record_id] = true
+	for key in ["resources", "structures", "robots", "belts"]:
+		for record in data[key]:
+			if not str(record.get("type_id", "")).contains(":") or int(record.get("object_version", -1)) != 1:
+				return false
 	for row in data["resources"]:
 		if not (row.get("position", null) is Array) or row["position"].size() != 3:
 			return false
