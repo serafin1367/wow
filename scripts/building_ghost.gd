@@ -5,6 +5,7 @@ const CENTER = preload("res://scripts/town_hall.gd")
 const FORESTER = preload("res://scripts/forester_hut.gd")
 const MINE = preload("res://scripts/automated_mine.gd")
 const SMELTER = preload("res://scripts/automated_smelter.gd")
+const WORKSHOP = preload("res://scripts/automated_workshop.gd")
 const SOLAR = preload("res://scripts/solar_array.gd")
 const BATTERY = preload("res://scripts/battery_bank.gd")
 const DEPOT = preload("res://scripts/logistics_depot.gd")
@@ -58,6 +59,8 @@ func _build_model(kind: String) -> Node3D:
 			return MINE.new()
 		"smelter":
 			return SMELTER.new()
+		"workshop":
+			return WORKSHOP.new()
 		"solar":
 			return SOLAR.new()
 		"battery":
