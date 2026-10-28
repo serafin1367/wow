@@ -26,7 +26,7 @@ func vec(raw: Variant) -> Vector3:
 func to_dict(game: Node3D) -> Dictionary:
 	var resources: Array = []
 	for resource in game.get_tree().get_nodes_in_group("resource_nodes"):
-		if not is_instance_valid(resource):
+		if not is_instance_valid(resource) or not game.is_ancestor_of(resource):
 			continue
 		var p: Vector3 = resource.global_position
 		var stable_id: String = "deposit:" + resource.name if resource.name in RESOURCE_NAMES else "resource:%s:%d:%d" % [resource.resource_type, roundi(p.x * 10.0), roundi(p.z * 10.0)]
@@ -102,6 +102,44 @@ func validate(data: Variant) -> bool:
 			return false
 	for key in ["resources", "structures", "robots", "belts"]:
 		if not (data[key] is Array):
+			return false
+	if data["resources"].size() > 1000 or data["structures"].size() > 100 or data["robots"].size() > 100 or data["belts"].size() > 2:
+		return false
+	if not data["planet"] in ["Mars", "Ziemia", "Kepler"]:
+		return false
+	if not (data["roads"] is Dictionary) or not (data["roads"].get("cells", null) is Array):
+		return false
+	if not (data["blueprints"] is Dictionary) or not (data["blueprints"].get("entries", null) is Array):
+		return false
+	if data["blueprints"]["entries"].size() > 12:
+		return false
+	var seen_ids: Dictionary = {}
+	for key in ["resources", "structures", "robots", "belts"]:
+		for record in data[key]:
+			if not (record is Dictionary):
+				return false
+			var record_id: String = str(record.get("save_id", ""))
+			if record_id.is_empty() or seen_ids.has(record_id):
+				return false
+			seen_ids[record_id] = true
+	for row in data["resources"]:
+		if not (row.get("position", null) is Array) or row["position"].size() != 3:
+			return false
+		if int(row.get("remaining", -1)) < 0:
+			return false
+		if not str(row.get("node_name", "")) in ["Tree", "GoldMine", "StoneQuarry", "IronOreDeposit"]:
+			return false
+	for row in data["structures"]:
+		if not str(row.get("kind", "")) in ["mine", "smelter", "center", "forester", "solar", "battery"]:
+			return false
+		if not (row.get("position", null) is Array) or row["position"].size() != 3:
+			return false
+	for row in data["robots"]:
+		if not str(row.get("role", "")) in ["miner", "hauler", "engineer"]:
+			return false
+		if not (row.get("position", null) is Array) or row["position"].size() != 3:
+			return false
+		if int(row.get("cargo_amount", -1)) < 0:
 			return false
 	for belt in data["belts"]:
 		if not (belt is Dictionary) or not belt.get("mode", "") in ["ore", "metal"]:
