@@ -1496,6 +1496,12 @@ func _tick_logistics(delta: float) -> void:
 	# Kazdy magazyn jest niezaleznym punktem tranzytowym. Rezerwacje
 	# w tych samych buforach chronia przed podwojnym przydzialem rudy/metalu.
 	for hub in logistics_depots:
+		if factory_workshop != null:
+			# Ten sam Inventory i rezerwacje co pozostale maszyny.
+			logistics_manager.submit(hub, factory_workshop, "metal", 15, 108)
+			logistics_manager.submit(hub, factory_workshop, "steel", 15, 106)
+			logistics_manager.submit(factory_workshop, hub, "steel", 15, 103)
+			logistics_manager.submit(factory_workshop, hub, "electronics", 15, 101)
 		logistics_manager.submit(hub, stockpile, "metal", 25, 110, true)
 		if ore_conveyor == null:
 			logistics_manager.submit(hub, factory_smelter, "iron_ore", 25, 100)
@@ -1503,6 +1509,9 @@ func _tick_logistics(delta: float) -> void:
 			logistics_manager.submit(factory_smelter, hub, "metal", 25, 95)
 		if ore_conveyor == null:
 			logistics_manager.submit(factory_mine, hub, "iron_ore", 25, 85)
+	if factory_workshop != null:
+		# Bezposredni transport metalu z huty (nawet przy pustym depocie).
+		logistics_manager.submit(factory_smelter, factory_workshop, "metal", 15, 109)
 	logistics_manager.dispatch(workers, navigation)
 
 
@@ -1609,6 +1618,19 @@ func _production_snapshot() -> Dictionary:
 			"queue": factory_mine.production_queue.duplicate(true)})
 		if not str(report["mine_status"]) in ["PRACUJE", "WSTRZYMANA", "ZLECENIE WYKONANE"]:
 			alarms.append({"kind": "mine", "message": "KOPALNIA: " + str(report["mine_status"])})
+	if factory_workshop != null:
+		var wr = factory_workshop.active_recipe
+		var status: String = "WSTRZYMANA" if factory_workshop.production_paused else ("BRAK ENERGII" if not factory_workshop.power_enabled else ("ZLECENIE WYKONANE" if factory_workshop.cycles_remaining == 0 else ("OCZEKIWANIE NA MATERIAL" if not wr.can_process(factory_workshop.input_buffer, factory_workshop.output_buffer) else "PRACUJE")))
+		machines.append({"kind": "workshop", "name": "WARSZTAT MONTAZU", "status": status,
+			"recipe": "%s | %.1f s | %.1f kW" % [wr.display_name, wr.duration_seconds, wr.power_kw],
+			"buffers": factory_workshop.describe(),
+			"progress": 100.0 * clampf(factory_workshop.accumulated / wr.duration_seconds, 0.0, 1.0),
+			"paused": factory_workshop.production_paused,
+			"cycles_remaining": factory_workshop.cycles_remaining,
+			"priority": factory_workshop.production_priority,
+			"queue": []})
+		if not status in ["PRACUJE", "WSTRZYMANA", "ZLECENIE WYKONANE"]:
+			alarms.append({"kind": "workshop", "message": "WARSZTAT: " + status})
 	if factory_smelter != null:
 		machines.append({
 			"kind": "smelter", "name": "HUTA METALU", "status": report["smelter_status"],
@@ -1892,6 +1914,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_mine_mode()
 			return
 		if event.keycode == KEY_Y:
+			if event.shift_pressed and selected_structure == factory_workshop and factory_workshop != null:
+				var next_recipe: String = "assemble_electronics" if factory_workshop.recipe_id == "forge_steel" else "forge_steel"
+				if factory_workshop.set_recipe_id(next_recipe):
+					_set_status("Warsztat: " + factory_workshop.active_recipe.display_name)
+				else:
+					_set_status("Nie mozna zmienic receptury podczas trwajacego cyklu.")
+				return
 			_toggle_workshop_mode()
 			return
 		if event.keycode == KEY_H:
