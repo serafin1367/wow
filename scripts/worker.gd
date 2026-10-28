@@ -564,3 +564,67 @@ func status_text() -> String:
 		WorkState.TO_FACTORY_DEPOT:
 			return "Metal do magazynu"
 	return "Oczekiwanie"
+
+
+func to_dict() -> Dictionary:
+	var route: Array = []
+	for point in waypoints:
+		route.append([point.x, point.y, point.z])
+	return {"save_id": str(get_meta("save_id", "")),
+		"role": robot_role, "position": [global_position.x, global_position.y, global_position.z],
+		"rotation_y": rotation.y, "energy": energy, "state": int(state),
+		"cargo_type": carried_type, "cargo_amount": carried_amount,
+		"waypoints": route, "next_waypoint": next_waypoint,
+		"preferred_resource_type": preferred_resource_type,
+		"resource_id": str(resource_target.get_meta("save_id", "")) if is_instance_valid(resource_target) else "",
+		"repair_id": str(repair_target.get_meta("save_id", "")) if is_instance_valid(repair_target) else "",
+		"factory_route": factory_route_active, "factory_stage": factory_stage,
+		"ore_belt_enabled": ore_belt_enabled, "metal_belt_enabled": metal_belt_enabled,
+		"suspended_state": int(suspended_state),
+		"suspended_destination": [suspended_destination.x, suspended_destination.y, suspended_destination.z],
+		"depot_position": [depot_position.x, depot_position.y, depot_position.z],
+		"harvest_elapsed": harvest_elapsed, "factory_wait_elapsed": factory_wait_elapsed}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	energy = clampf(float(data.get("energy", BATTERY_MAX)), 0.0, BATTERY_MAX)
+	carried_type = str(data.get("cargo_type", ""))
+	carried_amount = maxi(0, int(data.get("cargo_amount", 0)))
+	state = clampi(int(data.get("state", int(WorkState.IDLE))), 0, int(WorkState.TO_FACTORY_DEPOT)) as WorkState
+	suspended_state = clampi(int(data.get("suspended_state", 0)), 0, int(WorkState.TO_FACTORY_DEPOT)) as WorkState
+	preferred_resource_type = str(data.get("preferred_resource_type", ""))
+	factory_route_active = bool(data.get("factory_route", false))
+	factory_stage = str(data.get("factory_stage", "pickup"))
+	ore_belt_enabled = bool(data.get("ore_belt_enabled", false))
+	metal_belt_enabled = bool(data.get("metal_belt_enabled", false))
+	harvest_elapsed = float(data.get("harvest_elapsed", 0.0))
+	factory_wait_elapsed = float(data.get("factory_wait_elapsed", 0.0))
+	var suspended = data.get("suspended_destination", [0, 0, 0])
+	suspended_destination = Vector3(float(suspended[0]), float(suspended[1]), float(suspended[2]))
+	var depot = data.get("depot_position", [0, 0, 0])
+	depot_position = Vector3(float(depot[0]), float(depot[1]), float(depot[2]))
+	waypoints.clear()
+	for point in data.get("waypoints", []):
+		if point is Array and point.size() == 3:
+			waypoints.append(Vector3(float(point[0]), float(point[1]), float(point[2])))
+	next_waypoint = clampi(int(data.get("next_waypoint", 0)), 0, waypoints.size())
+
+
+func restore_links(data: Dictionary, lookup: Dictionary, nav: RefCounted, charger: Node3D, drop_point: Vector3) -> void:
+	navigation_grid = nav
+	charging_station = charger
+	depot_position = drop_point
+	resource_target = lookup.get(str(data.get("resource_id", "")))
+	repair_target = lookup.get(str(data.get("repair_id", "")))
+	factory_mine = lookup.get("factory:mine")
+	factory_smelter = lookup.get("factory:smelter")
+	if factory_route_active and (factory_mine == null or factory_smelter == null):
+		factory_route_active = false
+		state = WorkState.IDLE
+	if (state == WorkState.TO_RESOURCE or state == WorkState.GATHERING) and resource_target == null:
+		state = WorkState.IDLE
+	if (state == WorkState.TO_REPAIR or state == WorkState.REPAIRING) and repair_target == null:
+		state = WorkState.IDLE
+	if state != WorkState.IDLE and state != WorkState.CHARGING and state != WorkState.GATHERING and state != WorkState.REPAIRING and state != WorkState.WAIT_FACTORY_PICKUP and state != WorkState.WAIT_FACTORY_OUTPUT and waypoints.is_empty():
+		state = WorkState.IDLE
