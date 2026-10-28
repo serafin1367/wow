@@ -17,6 +17,8 @@ var power_enabled: bool = false
 var production_paused: bool = false
 var production_priority: int = 90
 var cycles_remaining: int = -1
+var production_queue: Array[Dictionary] = []
+var next_order_id: int = 1
 var input_buffer = INVENTORY.new("factory:smelter:input")
 var output_buffer = INVENTORY.new("factory:smelter:output")
 var ore_stock: int:
@@ -82,11 +84,38 @@ func _process(delta: float) -> void:
 		total_smelted += produced
 		if cycles_remaining > 0:
 			cycles_remaining -= 1
+			if cycles_remaining == 0:
+				_activate_next_order()
 		stock_changed.emit()
 
 
 func set_production_target(cycles: int) -> void:
+	production_queue.clear()
 	cycles_remaining = maxi(-1, cycles)
+
+
+func enqueue_production(cycles: int, priority: int = 100) -> bool:
+	if cycles <= 0 or cycles > 1000 or production_queue.size() >= 16:
+		return false
+	var order: Dictionary = {"id": next_order_id, "cycles": cycles,
+		"priority": clampi(priority, 0, 200)}
+	next_order_id += 1
+	if cycles_remaining <= 0:
+		cycles_remaining = cycles
+	elif cycles_remaining == -1:
+		cycles_remaining = cycles
+	else:
+		production_queue.append(order)
+	return true
+
+
+func _activate_next_order() -> void:
+	if production_queue.is_empty():
+		return
+	production_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["priority"]) > int(b["priority"]))
+	var next_order: Dictionary = production_queue.pop_front()
+	cycles_remaining = int(next_order["cycles"])
 
 
 func deposit_ore(quantity: int) -> int:
@@ -140,7 +169,8 @@ func to_dict() -> Dictionary:
 		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated,
 		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict(),
 		"total_smelted": total_smelted, "production_paused": production_paused,
-		"cycles_remaining": cycles_remaining, "production_priority": production_priority}
+		"cycles_remaining": cycles_remaining, "production_priority": production_priority,
+		"production_queue": production_queue.duplicate(true), "next_order_id": next_order_id}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -158,3 +188,12 @@ func from_dict(data: Dictionary) -> void:
 	production_paused = bool(data.get("production_paused", false))
 	production_priority = clampi(int(data.get("production_priority", 90)), 0, 200)
 	cycles_remaining = maxi(-1, int(data.get("cycles_remaining", -1)))
+	next_order_id = maxi(1, int(data.get("next_order_id", 1)))
+	production_queue.clear()
+	for item in data.get("production_queue", []):
+		if item is Dictionary and production_queue.size() < 16:
+			var count: int = int(item.get("cycles", 0))
+			if count > 0 and count <= 1000:
+				production_queue.append({"id": maxi(1, int(item.get("id", 1))),
+					"cycles": count,
+					"priority": clampi(int(item.get("priority", 100)), 0, 200)})
