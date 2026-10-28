@@ -639,7 +639,9 @@ func _spawn_planned_structure(entry: Dictionary) -> void:
 	var structure: Node3D
 	match kind:
 		"mine":
-			var source = _mine_resource()
+			# Przy odczycie wyczerpanego zloza ekstraktor nadal istnieje,
+			# chociaz _mine_resource() odrzuca puste lub usuniete zloza.
+			var source = get_node_or_null("IronOreDeposit")
 			factory_mine = MINE_SCRIPT.new()
 			factory_mine.ore_source = source
 			structure = factory_mine
@@ -669,9 +671,10 @@ func _spawn_planned_structure(entry: Dictionary) -> void:
 	add_child(structure)
 	if kind == "mine":
 		var source = factory_mine.ore_source
-		source.collision_layer = 0
-		source.visible = false
-		source.remove_from_group("resource_nodes")
+		if is_instance_valid(source):
+			source.collision_layer = 0
+			source.visible = false
+			source.remove_from_group("resource_nodes")
 	if kind in ["mine", "smelter", "solar", "battery"]:
 		_connect_power_node(structure)
 	navigation.block_circle(Vector2(site.x, site.z), _build_radius(kind))
