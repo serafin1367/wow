@@ -264,8 +264,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path . --script res://tests/save_basics_smoke.gd > wow-windows-save-basics.log 2>&1
-          code=$?
+          code=0
+          godot --headless --path . --script res://tests/save_basics_smoke.gd > wow-windows-save-basics.log 2>&1 || code=$?
           cat wow-windows-save-basics.log
           if [ "$code" -ne 0 ]; then
             exit "$code"
