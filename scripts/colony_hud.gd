@@ -14,6 +14,7 @@ signal metal_conveyor_requested
 signal solar_array_requested
 signal battery_bank_requested
 signal road_requested
+signal depot_requested
 signal planning_requested
 signal sticky_requested
 signal commit_plan_requested
@@ -51,6 +52,7 @@ var storage_label: Label
 var solar_button: Button
 var battery_button: Button
 var road_button: Button
+var depot_button: Button
 var planning_button: Button
 var sticky_button: Button
 var plan_info_label: Label
@@ -101,7 +103,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.13", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.14", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -230,6 +232,10 @@ func _make_bottom_bar() -> void:
 	road_button.custom_minimum_size.y = 32
 	road_button.pressed.connect(func(): road_requested.emit())
 	energy_actions.add_child(road_button)
+	depot_button = _action_button("U   DEPOT", "Magazyn posredni: 15 drewna i 10 kamienia; limit 3.", TURQUOISE)
+	depot_button.custom_minimum_size.y = 32
+	depot_button.pressed.connect(func(): depot_requested.emit())
+	energy_actions.add_child(depot_button)
 	planning_button = _action_button("F   PROJEKT", "LPM planuje budynki, Enter buduje wszystkie.", TURQUOISE)
 	planning_button.custom_minimum_size.y = 32
 	planning_button.pressed.connect(func(): planning_requested.emit())
@@ -284,6 +290,7 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("R / Shift+R   Obrot budynku", 12, ORANGE))
 	help.add_child(_label("G   Siatka 1/2/4 m", 12, TEXT))
 	help.add_child(_label("D   Droga | F   Plan", 12, TURQUOISE))
+	help.add_child(_label("U   Magazyn posredni", 12, ORANGE))
 	help.add_child(_label("X   Budowa seryjna", 12, TEXT))
 	help.add_child(_label("Ctrl+S / Ctrl+O   Zapis / odczyt", 11, TURQUOISE))
 	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
