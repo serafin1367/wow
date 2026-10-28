@@ -58,6 +58,7 @@ var ore_belt_button: Button
 var metal_belt_button: Button
 var balance_label: Label
 var storage_label: Label
+var throughput_label: Label
 var solar_button: Button
 var battery_button: Button
 var road_button: Button
@@ -125,7 +126,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.14", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.15", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -153,6 +154,13 @@ func _make_top_bar() -> void:
 	storage_label = _label("AKUMULACJA: 0.0 kWh", 11, MUTED)
 	power_block.add_child(storage_label)
 	row.add_child(power_block)
+	row.add_child(VSeparator.new())
+	var production_block := VBoxContainer.new()
+	production_block.custom_minimum_size.x = 170
+	production_block.add_child(_label("PRODUKCJA / MIN", 11, MUTED, true))
+	throughput_label = _label("Ruda: 0.0 | Metal: 0.0", 11, TURQUOISE)
+	production_block.add_child(throughput_label)
+	row.add_child(production_block)
 
 
 func _make_bottom_bar() -> void:
@@ -340,6 +348,12 @@ func toggle_logistics_panel() -> bool:
 func refresh_logistics_panel(depots: Array[Dictionary], jobs: Array[Dictionary]) -> void:
 	if logistics_panel != null and logistics_panel.visible:
 		logistics_panel.show_state(depots, jobs)
+
+
+func set_production_rates(data: Dictionary) -> void:
+	if throughput_label != null:
+		throughput_label.text = "RUDA %.1f / min\nMETAL %.1f / min" % [
+			float(data.get("ore_per_min", 0.0)), float(data.get("metal_per_min", 0.0))]
 
 
 func set_planet(planet: String) -> void:
