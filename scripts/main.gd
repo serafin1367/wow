@@ -25,6 +25,7 @@ const ROADS_SCRIPT = preload("res://scripts/technical_roads.gd")
 const BLUEPRINTS_SCRIPT = preload("res://scripts/construction_blueprints.gd")
 const LOGISTICS_DEPOT = preload("res://scripts/logistics_depot.gd")
 const LOGISTICS_MANAGER = preload("res://scripts/logistics_manager.gd")
+const PRODUCTION_MONITOR = preload("res://scripts/production_monitor.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_game_manager.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
@@ -66,6 +67,7 @@ var forester_build_mode: bool = false
 var depot_build_mode: bool = false
 var logistics_depots: Array = []
 var logistics_manager = LOGISTICS_MANAGER.new()
+var production_monitor = PRODUCTION_MONITOR.new()
 var logistics_elapsed: float = 0.0
 var foresters: Array = []
 var build_mode: bool = false
@@ -1560,6 +1562,7 @@ func _create_hud() -> void:
 
 
 func _process(delta: float) -> void:
+	production_monitor.capture(factory_mine, factory_smelter, delta)
 	_tick_logistics(delta)
 	_update_build_preview(delta)
 	_update_road_preview(delta)
@@ -1583,6 +1586,8 @@ func _update_colony_hud() -> void:
 			stored_kwh += bank.stored_kwh
 		hud.set_energy_storage(stored_kwh, float(battery_banks.size()) * BATTERY_SCRIPT.CAPACITY_KWH, grid_generation_kw)
 
+	var production: Dictionary = production_monitor.report(factory_mine, factory_smelter)
+	hud.set_production_rates(production)
 	if selected_workers.size() == 1:
 		var robot = selected_workers[0]
 		hud.set_robot(robot.role_name(), robot.status_text(), robot.energy, robot.carried_amount)
@@ -1598,9 +1603,9 @@ func _update_colony_hud() -> void:
 		elif selected_structure in foresters:
 			hud.set_structure("MODUL REKULTYWACJI", "Odnawianie drzew: cykl 8 sekund.")
 		elif selected_structure == factory_mine:
-			hud.set_structure("KOPALNIA ZELAZA", factory_mine.describe() + (" | TASMA RUDA" if ore_conveyor != null else ""))
+			hud.set_structure("KOPALNIA ZELAZA", "%s | %s | Cykl %.0f%%" % [factory_mine.describe(), production["mine_status"], production["mine_progress"]])
 		elif selected_structure == factory_smelter:
-			hud.set_structure("HUTA METALU", factory_smelter.describe() + (" | TASMA METAL" if metal_conveyor != null else ""))
+			hud.set_structure("HUTA METALU", "%s | %s | Cykl %.0f%%" % [factory_smelter.describe(), production["smelter_status"], production["smelter_progress"]])
 		elif selected_structure in logistics_depots:
 			hud.set_structure("MAGAZYN POSREDNI", selected_structure.describe())
 		elif selected_structure in solar_arrays:
