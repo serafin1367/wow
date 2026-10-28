@@ -51,9 +51,10 @@ func to_dict(game: Node3D) -> Dictionary:
 	var groups: Dictionary = {
 		"mine": [game.factory_mine], "smelter": [game.factory_smelter],
 		"center": [game.town_hall], "forester": game.foresters,
-		"solar": game.solar_arrays, "battery": game.battery_banks
+		"solar": game.solar_arrays, "battery": game.battery_banks,
+		"depot": game.logistics_depots
 	}
-	for kind in ["mine", "smelter", "center", "forester", "solar", "battery"]:
+	for kind in ["mine", "smelter", "center", "forester", "solar", "battery", "depot"]:
 		var nodes: Array = groups[kind]
 		for i in range(nodes.size()):
 			var node = nodes[i]
@@ -145,7 +146,7 @@ func validate(data: Variant) -> bool:
 		if not str(row.get("node_name", "")) in ["Tree", "GoldMine", "StoneQuarry", "IronOreDeposit"]:
 			return false
 	for row in data["structures"]:
-		if not str(row.get("kind", "")) in ["mine", "smelter", "center", "forester", "solar", "battery"]:
+		if not str(row.get("kind", "")) in ["mine", "smelter", "center", "forester", "solar", "battery", "depot"]:
 			return false
 		if not (row.get("position", null) is Array) or row["position"].size() != 3:
 			return false
@@ -284,6 +285,7 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 			"forester": building = game.foresters[game.foresters.size() - 1]
 			"solar": building = game.solar_arrays[game.solar_arrays.size() - 1]
 			"battery": building = game.battery_banks[game.battery_banks.size() - 1]
+			"depot": building = game.logistics_depots[game.logistics_depots.size() - 1]
 		if building == null:
 			continue
 		building.from_dict(row)
