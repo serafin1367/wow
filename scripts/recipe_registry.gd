@@ -15,6 +15,24 @@ const DEFINITIONS: Dictionary = {
 		"duration_seconds": 3.0,
 		"power_kw": 2.5
 	},
+	"forge_steel": {
+		"recipe_id": "forge_steel",
+		"machine_kind": "workshop",
+		"display_name": "Produkcja stali",
+		"inputs": {"metal": 2},
+		"outputs": {"steel": 1},
+		"duration_seconds": 5.0,
+		"power_kw": 3.0
+	},
+	"assemble_electronics": {
+		"recipe_id": "assemble_electronics",
+		"machine_kind": "workshop",
+		"display_name": "Montaz elektroniki",
+		"inputs": {"steel": 1, "metal": 1},
+		"outputs": {"electronics": 1},
+		"duration_seconds": 8.0,
+		"power_kw": 2.0
+	},
 	"mine_iron_ore": {
 		"recipe_id": "mine_iron_ore",
 		"machine_kind": "mine",
