@@ -27,6 +27,7 @@ signal logistics_refresh_requested
 signal logistics_stock_limits_requested(depot_id: String, resource_type: String, minimum: int, maximum: int)
 signal logistics_priority_requested(job_id: String, priority: int)
 signal logistics_cancel_requested(job_id: String)
+signal logistics_redirect_requested(job_id: String, destination_id: String)
 
 const LOGISTICS_PANEL = preload("res://scripts/logistics_panel.gd")
 const BG = Color(0.065, 0.105, 0.145, 0.94)
@@ -87,6 +88,8 @@ func _ready() -> void:
 		logistics_priority_requested.emit(a, b))
 	logistics_panel.cancel_requested.connect(func(a: String):
 		logistics_cancel_requested.emit(a))
+	logistics_panel.redirect_requested.connect(func(a: String, b: String):
+		logistics_redirect_requested.emit(a, b))
 	set_resources(0, 0, 0, 0, 3, 30)
 	set_power(0.0, false)
 	set_no_selection()
