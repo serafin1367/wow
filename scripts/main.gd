@@ -72,6 +72,7 @@ var build_mode: bool = false
 var town_hall: StaticBody3D
 var training_timer: Timer
 var training_in_progress: bool = false
+var training_role: String = "miner"
 var landing_rocket = null
 var charging_pad = null
 var hud_elapsed: float = 0.0
@@ -1586,7 +1587,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_build_mode()
 			return
 		if event.keycode == KEY_T:
-			_train_worker()
+			_train_worker("hauler" if event.shift_pressed else "miner")
 			return
 		if event.keycode == KEY_L:
 			_toggle_forester_mode()
@@ -2053,7 +2054,7 @@ func _is_tree_planting_site_clear(spot: Vector2, hut: StaticBody3D) -> bool:
 	return true
 
 
-func _train_worker() -> void:
+func _train_worker(role: String = "miner") -> void:
 	if town_hall == null:
 		_set_status("Najpierw zbuduj ratusz (B).")
 		return
@@ -2067,8 +2068,9 @@ func _train_worker() -> void:
 		_set_status("Brakuje surowcow: robotnik kosztuje 10 drewna i 20 zlota.")
 		return
 	training_in_progress = true
+	training_role = role if role in ["miner", "hauler"] else "miner"
 	training_timer.start()
-	_set_status("Trwa szkolenie robotnika (4 sekundy).")
+	_set_status("Trwa budowa robota: %s (4 sekundy)." % training_role)
 	_update_action_buttons()
 
 
@@ -2087,10 +2089,10 @@ func _finish_training() -> void:
 		_set_status("Brak wolnego miejsca na robotnika. Zasoby zwrocone.")
 		_update_action_buttons()
 		return
-	var worker = _spawn_worker(spawn_position)
+	var worker = _spawn_worker(spawn_position, training_role)
 	_announce_new_worker(worker)
 	_update_resource_hud()
-	_set_status("Nowy robotnik gotowy przed ratuszem. Liczba robotnikow: %d." % workers.size())
+	_set_status("Nowy robot %s gotowy. Robotow w kolonii: %d." % [training_role, workers.size()])
 	_update_action_buttons()
 
 
