@@ -144,6 +144,24 @@ func _run_test() -> void:
 			fresh.factory_smelter.ore_stock, str(fresh.ore_conveyor.to_dict()["packets"])])
 		return
 
+	# Stan graniczny: po wyczerpaniu i zniknieciu zloza budynek kopalni
+	# nadal musi przezyc odczyt, bez prob dereferencji nieistniejacego Node.
+	var finished_ore = fresh.get_node_or_null("IronOreDeposit")
+	if finished_ore != null:
+		fresh.remove_child(finished_ore)
+		finished_ore.queue_free()
+	fresh.factory_mine.ore_source = null
+	var exhausted_data: Dictionary = manager.to_dict(fresh)
+	var recovered = load("res://scenes/main.tscn").instantiate()
+	root.add_child(recovered)
+	if not manager.from_dict(recovered, exhausted_data):
+		_fail("Nie mozna wczytac kolonii z wyczerpanym zlozem")
+		return
+	if recovered.factory_mine == null or recovered.factory_mine.has_ore():
+		_fail("Ekstraktor po odczycie pustego zloza ma niepoprawny stan")
+		return
+	recovered.queue_free()
+
 	var damaged: Dictionary = disk.duplicate(true)
 	damaged["schema_version"] = 999
 	if manager.validate(damaged):
