@@ -117,6 +117,16 @@ jobs:
             echo "Save/load integration test failed."
             exit 1
           fi
+      - name: Test shared inventory reservations and logistic cargo ownership
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/inventory_smoke.gd 2>&1 | tee /tmp/wow-inventory.log
+          grep -F 'INVENTORY SMOKE OK' /tmp/wow-inventory.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|INVENTORY TEST:' /tmp/wow-inventory.log; then
+            echo "Inventory test failed"
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
