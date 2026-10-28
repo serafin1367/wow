@@ -78,9 +78,12 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 **Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców; przełączenie odbioru z robota na taśmę **nie wymaga zmiany logiki magazynu**. Proponowane moduły: `Inventory`, `BufferPort`, `LogisticsManager`, `TransportJob`.
 
-### WOW 0.15 — centrum zarządzania produkcją (P1)
+### WOW 0.15 — centrum zarządzania produkcją (P1) — **rozpoczęty**
 
-- [ ] Panel wybranego budynku: wejście, wyjście, receptura, postęp cyklu, stan energii.
+Pierwsza implementacja: trwałe liczniki wydobycia i przetopienia oraz `scripts/production_monitor.gd`, pomiar produkcji/min z okna 60 s, postęp cyklu, diagnoza braku energii/pełnego bufora, informacje o recepturze i wejściach/wyjściach w panelu zaznaczonego budynku. Test: `tests/production_monitor_smoke.gd`. Pozostają: pełne zużycie/min, obciążenie robotów, kolejki, alarmy z nawigacją i ręczny odbiór wizualny HUD.
+
+
+- [x] Panel wybranego budynku: wejście, wyjście, receptura, postęp cyklu, stan energii.
 - [ ] Widok całej kolonii: produkcja/min, zużycie/min, dostępne zasoby, obciążenie robotów.
 - [ ] Kolejki produkcji z możliwością pauzy i zmiany priorytetu.
 - [ ] Czytelne alarmy: brak rudy, pełny bufor, brak transportowca, brak energii.
