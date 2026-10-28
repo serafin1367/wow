@@ -42,27 +42,35 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 ### WOW 0.13 — trwały zapis i odczyt gry (P0) — **następny etap**
 
 - [ ] Wyodrębnić `SaveGameManager` z wersjonowanym formatem danych (`schema_version`).
+- [ ] Ustalić **wspólny kontrakt serializacji dla wszystkich obiektów utrwalanych w stanie gry**: `to_dict() -> Dictionary` i `from_dict(data: Dictionary) -> void` lub równoważny adapter dla `Resource`. Wymagany od 0.13 także dla **każdego nowego obiektu z etapów 0.14+**, w tym magazynów, portów i zleceń logistycznych; stan nie może zależeć od bezpośredniej serializacji `Node`.
+- [ ] Zdefiniować stabilne identyfikatory `save_id`, `type_id` i wersje danych obiektów; zapisywać **identyfikatory relacji**, nie ścieżki `NodePath`, instancje węzłów ani referencje w pamięci.
+- [ ] Odtwarzać scenę **dwuetapowo**: (1) tworzenie obiektów z danych, (2) rozwiązanie relacji po `save_id`, następnie wznowienie symulacji; nie uruchamiać produkcji/transportu podczas częściowego odczytu.
 - [ ] Dodać ręczny **Zapisz / Wczytaj** oraz co najmniej jeden slot zapisu.
 - [ ] Odtwarzać planetę, zasoby globalne, pozycję/obrót budynków, zapasy magazynów i rezerwy złóż.
 - [ ] Odtwarzać roboty, poziom ich energii, ładunki, role oraz bezpiecznie wznowić zadania.
 - [ ] Zachowywać trasy taśmociągów, paczki w transporcie, drogi, akumulatory i niewykonane projekty.
+- [ ] Dla każdej paczki na taśmie zapisywać **identyfikator trasy/segmentu, typ i ilość surowca, pozycję logiczną (dystans lub postęp), kierunek oraz stan dostawy**; po odczycie odtwarzać jej pozycję 3D z geometrii trasy, bez polegania na starej transformacji modelu wizualnego.
 - [ ] Zapisywać atomowo (plik tymczasowy + podmiana) i obsłużyć brak/uszkodzenie pliku.
 - [ ] Dodać test: **zapis → odczyt → porównanie stanu**, bez utraty lub duplikowania surowców.
+- [ ] Rozszerzyć `tests/save_load_smoke.gd` o zapis **podczas ruchu paczek** i przy pełnym buforze odbiorcy: po odczycie żadna paczka nie może zniknąć, zawisnąć poza taśmą ani trafić podwójnie do magazynu; animacja ma wznowić ruch z zachowanego postępu. Porównać bilans **wejście + ładunek w drodze + bufory + wyjście** przed/po odczycie.
 - [ ] Sprawdzić poprawne działanie zapisu na Windows i Linux.
 
-**Kryterium ukończenia:** po ponownym uruchomieniu gry kolonia ma te same budynki, stany magazynowe, roboty i infrastrukturę; produkcja może być wznowiona. Proponowany plik: `scripts/save_game_manager.gd`, test `tests/save_load_smoke.gd`.
+**Kryterium ukończenia:** po ponownym uruchomieniu gry kolonia ma te same budynki, stany magazynowe, roboty i infrastrukturę; produkcja może być wznowiona **bez znikających/duplikowanych paczek i bez osieroconych obiektów 3D**. Nowe encje implementują kontrakt serializacji od chwili powstania. Proponowany plik: `scripts/save_game_manager.gd`, test `tests/save_load_smoke.gd`.
 
 ### WOW 0.14 — magazyny pośrednie i logistyka (P0)
 
 - [ ] Nowy budynek: **depot logistyczny** z ograniczoną pojemnością i kilkoma typami surowca.
 - [ ] Model ekwipunku dla magazynów i maszyn: wolne miejsce, rezerwacje, pobranie, dostarczenie.
+- [ ] Zdefiniować **wspólny model portu/buforu wejścia–wyjścia (`Inventory` / `BufferPort`)** dla maszyn, magazynów, robotów i taśmociągów. Ten sam interfejs ma obsługiwać sprawdzenie pojemności, rezerwację, pobranie i przyjęcie ładunku; bez osobnych, rozbieżnych implementacji „dla robota” i „dla taśmy”.
+- [ ] Zdefiniować jednoznaczne przekazanie własności ładunku: odebrana jednostka znika z bufora źródła **dokładnie raz**, a przyjęta pojawia się w buforze celu **dokładnie raz**. Pełny bufor nie może usuwać ani duplikować ładunku pozostającego na robocie/taśmie.
+- [ ] Nadać magazynom, buforom, portom i zleceniom stabilne `save_id` oraz kontrakt `to_dict()` / `from_dict()` wdrożony w WOW 0.13.
 - [ ] Uogólnić zlecenia transportowe: **skąd → co → ile → dokąd**, zamiast sztywnej trasy kopalnia–huta.
 - [ ] Automatyczny przydział wolnego transportowca do najważniejszego zlecenia.
 - [ ] Ustawianie priorytetów zleceń i limitów zapasu (min./maks.) dla magazynów.
 - [ ] Obsłużyć brak drogi, pełny magazyn, rozładowany robot, zmianę celu i anulowanie zlecenia.
-- [ ] Test wielu magazynów i robotów: **każda jednostka ładunku ma dokładnie jednego właściciela**.
+- [ ] Test wielu magazynów, robotów i taśmociągów korzystających z **tych samych portów**: **każda jednostka ładunku ma dokładnie jednego właściciela**. Zweryfikować również zapis/odczyt z aktywnymi rezerwacjami.
 
-**Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców. Proponowane moduły: `Inventory`, `LogisticsManager`, `TransportJob`.
+**Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców; przełączenie odbioru z robota na taśmę **nie wymaga zmiany logiki magazynu**. Proponowane moduły: `Inventory`, `BufferPort`, `LogisticsManager`, `TransportJob`.
 
 ### WOW 0.15 — centrum zarządzania produkcją (P1)
 
@@ -103,7 +111,8 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 - [ ] Łączenie odcinków w sieć oraz rozgałęziacze, łączenia i kierunki przepływu.
 - [ ] Sortowanie surowców oraz wybór wejścia/wyjścia w budynkach.
 - [ ] Limit przepustowości, cofanie przy pełnych buforach, przenoszenie paczek między segmentami.
-- [ ] Usuwanie/przebudowa fragmentów **bez utraty ładunku**.
+- [ ] Wykorzystać **te same porty wejścia–wyjścia i reguły rezerwacji `Inventory` / `BufferPort` z 0.14**, zamiast tworzyć osobne bufory taśmociągów.
+- [ ] Usuwanie/przebudowa fragmentów **bez utraty ładunku**, z zachowaniem poprawności zapisu/odczytu paczek w ruchu.
 - [ ] Optymalizacja: instancing i test wielu segmentów oraz paczek.
 
 **Kryterium ukończenia:** jeden ekstraktor może zasilać dwa różne odbiorniki przez rozdzielacz.
@@ -163,9 +172,10 @@ Wersję 1.0 uznajemy za gotową, jeżeli spełnia **wszystkie** warunki:
 3. **Jedna walidacja budowy.** Drogi, przewody, taśmy, budynki i hologramy korzystają ze wspólnych reguł kolizji/zajętości.
 4. **Dane zamiast logiki na sztywno.** Receptury, parametry robotów, budynki i planety definiować jako zasoby konfiguracyjne.
 5. **Automatyczne testy.** Każda nowa mechanika ma własny test `--headless`; wszystkie stare testy pozostają zielone.
-6. **Bezpieczny zapis.** Dodawane systemy powinny od początku obsługiwać serializację danych, a nie zapisywać referencje do węzłów.
+6. **Bezpieczny zapis jako kontrakt architektoniczny.** Każdy nowy obiekt trwałego stanu implementuje `to_dict() -> Dictionary` / `from_dict(data: Dictionary) -> void` albo wspólny adapter `Resource`. Relacje używają stabilnych `save_id`, a odtwarzanie jest dwuetapowe; **nie serializujemy `Node` ani bezpośrednich referencji**.
 7. **Grafika jest funkcjonalna.** Animacja i efekty odpowiadają faktycznemu stanowi produkcji, zasilania lub transportu.
 8. **Licencje assetów.** Zachować informacje o źródle i licencji, w szczególności Kenney CC0.
+9. **Wspólny interfejs logistyki.** Roboty i taśmociągi używają tego samego `Inventory` / `BufferPort`; w testach musi zgadzać się bilans magazynów, ładunków w drodze i rezerwacji.
 
 **Definicja ukończenia pojedynczego zadania (DoD):** kod w `main`, zielone CI, test regresji, krótka aktualizacja dokumentacji oraz test wizualny w Godot 4 na Windows w przypadku zmian interfejsu lub scen.
 
@@ -173,10 +183,10 @@ Wersję 1.0 uznajemy za gotową, jeżeli spełnia **wszystkie** warunki:
 
 Pracę zaczynamy od **WOW 0.13**. Konkretna kolejność implementacji:
 
-- [ ] **S1.** Spisać stan gry wymagający serializacji; zdefiniować `schema_version = 1` i format zapisu.
-- [ ] **S2.** Dodać `SaveGameManager` + zapis/odczyt danych podstawowych (planeta, surowce, budynki, obrót).
-- [ ] **S3.** Dodać odtwarzanie stanów źródeł, energii, robotów, dróg i projektów.
-- [ ] **S4.** Dodać taśmociągi i ładunki w drodze — z testem braku duplikacji materiałów.
+- [ ] **S1.** Spisać stan gry wymagający serializacji; zdefiniować `schema_version = 1`, stabilne `save_id` i **obowiązkowy kontrakt `to_dict()` / `from_dict()` dla każdego nowego trwałego obiektu (również w 0.14+)**.
+- [ ] **S2.** Dodać `SaveGameManager` + zapis/odczyt danych podstawowych (planeta, surowce, budynki, obrót) z kontraktem serializacji; **nie utrwalać referencji do `Node`**.
+- [ ] **S3.** Dodać dwuetapowe odtwarzanie stanów źródeł, energii, robotów, dróg i projektów: najpierw instancje z `from_dict()`, potem rozwiązanie zależności po `save_id`, na końcu wznowienie symulacji.
+- [ ] **S4.** Dodać taśmociągi i ładunki w drodze: zapisać identyfikator trasy, surowiec, ilość i logiczny postęp paczki; po odczycie odtworzyć pozycję 3D na taśmie. Test `tests/save_load_smoke.gd` musi wykluczać **zniknięcie, zawieszenie w powietrzu lub duplikację paczek**, także przy zablokowanym wyjściu.
 - [ ] **S5.** Dodać przyciski zapisu/odczytu do HUD/menu i obsługę błędów.
 - [ ] **S6.** Dodać `tests/save_load_smoke.gd` do GitHub Actions; sprawdzić Windows.
 - [ ] **S7.** Po zielonym CI oznaczyć etap 0.13 jako ukończony i rozpocząć 0.14.
