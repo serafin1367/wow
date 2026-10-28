@@ -15,6 +15,8 @@ const MAX_BUFFER: int = 80
 
 var ore_source = null
 var power_enabled: bool = false
+var production_paused: bool = false
+var cycles_remaining: int = -1
 var output_buffer = INVENTORY.new("factory:mine:output")
 var stock: int:
 	get:
@@ -60,11 +62,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if machine_visual != null:
-		machine_visual.is_working = power_enabled and has_ore() and stock < MAX_BUFFER
-	if not power_enabled or not has_ore() or stock >= MAX_BUFFER:
+		machine_visual.is_working = power_enabled and not production_paused and cycles_remaining != 0 and has_ore() and stock < MAX_BUFFER
+	if not power_enabled or production_paused or cycles_remaining == 0 or not has_ore() or stock >= MAX_BUFFER:
 		return
 	accumulated += delta
-	while accumulated >= CYCLE_SECONDS and stock < MAX_BUFFER and has_ore():
+	while accumulated >= CYCLE_SECONDS and stock < MAX_BUFFER and has_ore() and cycles_remaining != 0:
 		accumulated -= CYCLE_SECONDS
 		var count: int = mini(RATE, MAX_BUFFER - stock)
 		var extracted: int = ore_source.harvest(count)
@@ -72,7 +74,13 @@ func _process(delta: float) -> void:
 			var accepted: int = output_buffer.push("iron_ore", extracted)
 			assert(accepted == extracted, "Mine output buffer must accept extracted ore")
 			total_extracted += accepted
+			if cycles_remaining > 0:
+				cycles_remaining -= 1
 			stock_changed.emit()
+
+
+func set_production_target(cycles: int) -> void:
+	cycles_remaining = maxi(-1, cycles)
 
 
 func has_ore() -> bool:
@@ -113,7 +121,8 @@ func to_dict() -> Dictionary:
 		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
 		"stock": stock, "accumulated": accumulated,
 		"source_id": str(ore_source.get_meta("save_id", "")) if is_instance_valid(ore_source) else "",
-		"output_buffer": output_buffer.to_dict(), "total_extracted": total_extracted}
+		"output_buffer": output_buffer.to_dict(), "total_extracted": total_extracted,
+		"production_paused": production_paused, "cycles_remaining": cycles_remaining}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -124,3 +133,5 @@ func from_dict(data: Dictionary) -> void:
 		stock = clampi(int(data.get("stock", 0)), 0, MAX_BUFFER)
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
 	total_extracted = maxi(0, int(data.get("total_extracted", 0)))
+	production_paused = bool(data.get("production_paused", false))
+	cycles_remaining = maxi(-1, int(data.get("cycles_remaining", -1)))
