@@ -661,6 +661,10 @@ func status_text() -> String:
 			return "Odbior metalu"
 		WorkState.TO_FACTORY_DEPOT:
 			return "Metal do magazynu"
+		WorkState.TO_LOGISTICS_PICKUP:
+			return "Logistyka: po %s (%d szt.)" % [logistics_type, logistics_amount]
+		WorkState.TO_LOGISTICS_DELIVERY:
+			return "Logistyka: dostawa %s (%d szt.)" % [logistics_type, carried_amount]
 	return "Oczekiwanie"
 
 
