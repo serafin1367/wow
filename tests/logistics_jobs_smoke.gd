@@ -34,7 +34,8 @@ func _run() -> void:
 	game.factory_smelter.power_enabled = false
 	var robot = game.workers[1]
 	robot.set_physics_process(false)
-	robot.command_move([])
+	var clear_route: Array[Vector3] = []
+	robot.command_move(clear_route)
 	print("JOB STEP 2: schedule and route")
 	game._tick_logistics(0.9)
 	var job: Dictionary = {}
