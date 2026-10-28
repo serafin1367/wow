@@ -902,6 +902,7 @@ func _update_build_preview(delta: float) -> void:
 
 
 func _cancel_build_modes() -> void:
+	_cancel_road_mode()
 	placement_rotation_quarters = 0
 	energy_build_kind = ""
 	_cancel_manual_conveyor()
@@ -1322,6 +1323,7 @@ func _spawn_worker(at_position: Vector3, role: String = "miner"):
 	worker.robot_role = role
 	worker.charging_station = charging_pad
 	worker.navigation_grid = navigation
+	worker.road_network = roads
 	worker.position = at_position
 	add_child(worker)
 	worker.resource_delivered.connect(_on_resource_delivered)
@@ -1363,6 +1365,11 @@ func _create_hud() -> void:
 	hud.metal_conveyor_requested.connect(_build_metal_conveyor)
 	hud.solar_array_requested.connect(_start_energy_build.bind("solar"))
 	hud.battery_bank_requested.connect(_start_energy_build.bind("battery"))
+	hud.road_requested.connect(_start_road_mode)
+	hud.planning_requested.connect(_toggle_planning)
+	hud.sticky_requested.connect(_toggle_sticky_build)
+	hud.commit_plan_requested.connect(_confirm_blueprints)
+	hud.clear_plan_requested.connect(_clear_blueprints)
 	hud.planet_change_requested.connect(_cycle_planet)
 	add_child(hud)
 
@@ -1379,6 +1386,7 @@ func _create_hud() -> void:
 
 func _process(delta: float) -> void:
 	_update_build_preview(delta)
+	_update_road_preview(delta)
 	hud_elapsed += delta
 	if hud_elapsed >= 0.25:
 		var elapsed_energy: float = hud_elapsed
@@ -1438,6 +1446,26 @@ func _charge_selected() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_D:
+			_start_road_mode()
+			return
+		if event.keycode == KEY_F:
+			_toggle_planning()
+			return
+		if event.keycode == KEY_X:
+			_toggle_sticky_build()
+			return
+		if event.keycode == KEY_BACKSPACE:
+			if road_mode and not road_anchors.is_empty():
+				road_anchors.pop_back()
+				_update_road_preview(1.0)
+				_set_status("Cofnieto punkt drogi.")
+			else:
+				_undo_blueprint()
+			return
+		if event.keycode == KEY_DELETE:
+			_clear_blueprints()
+			return
 		if event.keycode == KEY_R and _active_build_kind() != "":
 			_rotate_build_preview(event.shift_pressed)
 			return
@@ -1487,6 +1515,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			if manual_conveyor_kind != "":
 				_confirm_manual_conveyor()
 				return
+			if road_mode:
+				_confirm_road()
+				return
+			if blueprints != null and not blueprints.entries.is_empty():
+				_confirm_blueprints()
+				return
+		if event.keycode == KEY_ESCAPE and road_mode:
+			_cancel_road_mode()
+			_set_status("Anulowano ukladanie drogi.")
+			return
 		if event.keycode == KEY_ESCAPE and energy_build_kind != "":
 			energy_build_kind = ""
 			_set_status("Anulowano budowe instalacji energetycznej.")
@@ -1512,6 +1550,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
+		if road_mode:
+			if event.pressed:
+				_road_click(event.position)
+			return
+		if event.pressed and _active_build_kind() != "" and (planning_enabled or event.shift_pressed):
+			_queue_building_blueprint(event.position)
+			return
 		if energy_build_kind != "":
 			if event.pressed:
 				_try_place_energy_build(event.position)
@@ -1550,6 +1595,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_dragging = false
 
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if road_mode:
+			_cancel_road_mode()
+			_set_status("Anulowano droge.")
+			return
 		if energy_build_kind != "":
 			energy_build_kind = ""
 			_set_status("Anulowano budowe instalacji energetycznej.")
