@@ -85,9 +85,13 @@ func _test() -> void:
 		_fail("Nie mozna zapisac poprawnego snapshotu")
 		return
 	var disk: Dictionary = manager.read_file(SAVE_PATH)
-	if disk.is_empty() or disk["resources_total"] != snapshot["resources_total"]:
-		_fail("Plik JSON nie odtworzyl stanu zasobow")
+	if disk.is_empty():
+		_fail("Odczyt poprawnego pliku v1 zwrocil pusty Dictionary")
 		return
+	for resource_type in ["wood", "stone", "gold", "metal"]:
+		if int(disk["resources_total"].get(resource_type, -1)) != int(snapshot["resources_total"][resource_type]):
+			_fail("Plik JSON zmienil stan %s" % resource_type)
+			return
 	var good_file: String = FileAccess.get_file_as_string(SAVE_PATH)
 	# Dalszy zapis z ujemnym stanem musi zawiesc, a poprzedni
 	# poprawny plik musi pozostac nietkniety.
