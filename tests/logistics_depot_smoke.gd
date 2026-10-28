@@ -61,6 +61,13 @@ func _run() -> void:
 		_fail("Nie mozna zarezerwowac wyjazdu transportowca")
 		return
 
+	if not depot.set_stock_limits("iron_ore", 10, 110):
+		_fail("Nie udalo sie ustawic progow min/max")
+		return
+	if depot.available_import("iron_ore") != 13 or depot.available_export("iron_ore") != 79:
+		_fail("Limity magazynowe ignoruja rezerwacje")
+		return
+
 	var mgr = game.SAVE_SCRIPT.new()
 	var snapshot: Dictionary = mgr.to_dict(game)
 	if not mgr.validate(snapshot):
@@ -80,6 +87,9 @@ func _run() -> void:
 		return
 	if restored.cargo.available_output("iron_ore") != 89:
 		_fail("Odczyt nie zachowal rezerwacji robotow")
+		return
+	if restored.available_import("iron_ore") != 13 or restored.available_export("iron_ore") != 79:
+		_fail("Po zapisie zniknely limity magazynowe")
 		return
 	if not is_equal_approx(restored.rotation.y, PI * 0.5):
 		_fail("Utracono orientacje magazynu")
