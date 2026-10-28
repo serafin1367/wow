@@ -16,6 +16,7 @@ var ore_source = null
 var power_enabled: bool = false
 var stock: int = 0
 var accumulated: float = 0.0
+var machine_visual = null
 
 
 func _ready() -> void:
@@ -24,6 +25,7 @@ func _ready() -> void:
 	collision_mask = 0
 
 	var visual = MODEL.new()
+	machine_visual = visual
 	visual.machine_type = "extractor"
 	add_child(visual)
 
@@ -45,6 +47,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if machine_visual != null:
+		machine_visual.is_working = power_enabled and has_ore() and stock < MAX_BUFFER
 	if not power_enabled or not has_ore() or stock >= MAX_BUFFER:
 		return
 	accumulated += delta
