@@ -116,8 +116,13 @@ func _run() -> void:
 	if _balance(fresh) != mass_before:
 		_fail("Dostawa powielila lub zgubila zasoby")
 		return
+	# Drugi transportowiec i kolejny rodzaj ladunku: dwa zlecenia rownolegle.
+	var extra_hauler = fresh._spawn_worker(Vector3(6, 0, -2), "hauler")
+	extra_hauler.set_meta("save_id", "worker:extra")
+	extra_hauler.set_physics_process(false)
+	fresh.factory_smelter.metal_stock = 6
 	# W kolejnej turze utworz przeplyw depot -> huta.
-	print("JOB STEP 7: queue next leg")
+	print("JOB STEP 7: queue two simultaneous legs")
 	fresh._tick_logistics(0.9)
 	var second: Dictionary = {}
 	for candidate in fresh.logistics_manager.jobs:
@@ -125,6 +130,16 @@ func _run() -> void:
 			second = candidate
 	if second.is_empty():
 		_fail("Magazyn nie generuje dostaw do huty")
+		return
+	var metal_job: Dictionary = {}
+	for candidate in fresh.logistics_manager.jobs:
+		if candidate["source_id"] == "factory:smelter" and candidate["resource_type"] == "metal":
+			metal_job = candidate
+	if metal_job.is_empty() or second["status"] != "assigned" or metal_job["status"] != "assigned":
+		_fail("Menedzer nie przydzielil dwoch rownoleglych transportowcow")
+		return
+	if second["worker_id"] == metal_job["worker_id"]:
+		_fail("Dwa zlecenia zostaly przydzielone jednemu robotowi jednoczesnie")
 		return
 	if int(second["amount"]) != 15:
 		_fail("Ochrona zapasu minimalnego magazynu nie dziala")
