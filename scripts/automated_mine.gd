@@ -85,3 +85,16 @@ func describe() -> String:
 	elif not has_ore():
 		status = "ZLOZE WYCZERPANE"
 	return "%s | Ruda: %d/%d | Zloze: %s | %.1f kW" % [status, stock, MAX_BUFFER, raw_left, POWER_KW]
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "position":
+		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
+		"stock": stock, "accumulated": accumulated,
+		"source_id": str(ore_source.get_meta("save_id", "")) if is_instance_valid(ore_source) else ""}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	stock = clampi(int(data.get("stock", 0)), 0, MAX_BUFFER)
+	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
