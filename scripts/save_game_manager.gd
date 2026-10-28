@@ -51,17 +51,18 @@ func to_dict(game: Node3D) -> Dictionary:
 	var structures: Array = []
 	var groups: Dictionary = {
 		"mine": [game.factory_mine], "smelter": [game.factory_smelter],
+		"workshop": [game.factory_workshop],
 		"center": [game.town_hall], "forester": game.foresters,
 		"solar": game.solar_arrays, "battery": game.battery_banks,
 		"depot": game.logistics_depots
 	}
-	for kind in ["mine", "smelter", "center", "forester", "solar", "battery", "depot"]:
+	for kind in ["mine", "smelter", "workshop", "center", "forester", "solar", "battery", "depot"]:
 		var nodes: Array = groups[kind]
 		for i in range(nodes.size()):
 			var node = nodes[i]
 			if not is_instance_valid(node):
 				continue
-			_id(node, "factory:%s" % kind if kind == "mine" or kind == "smelter" else "building:%s:%d" % [kind, i])
+			_id(node, "factory:%s" % kind if kind == "mine" or kind == "smelter" or kind == "workshop" else "building:%s:%d" % [kind, i])
 			var state: Dictionary = node.to_dict()
 			state["kind"] = kind
 			state["type_id"] = "building:" + kind
@@ -170,7 +171,7 @@ func validate(data: Variant) -> bool:
 		if not str(row.get("node_name", "")) in ["Tree", "GoldMine", "StoneQuarry", "IronOreDeposit"]:
 			return false
 	for row in data["structures"]:
-		if not str(row.get("kind", "")) in ["mine", "smelter", "center", "forester", "solar", "battery", "depot"]:
+		if not str(row.get("kind", "")) in ["mine", "smelter", "workshop", "center", "forester", "solar", "battery", "depot"]:
 			return false
 		if not (row.get("position", null) is Array) or row["position"].size() != 3:
 			return false
@@ -314,7 +315,7 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 
 	for row in data["structures"]:
 		var kind: String = str(row.get("kind", ""))
-		if not kind in ["mine", "smelter", "center", "forester", "solar", "battery", "depot"]:
+		if not kind in ["mine", "smelter", "workshop", "center", "forester", "solar", "battery", "depot"]:
 			continue
 		var pos: Vector3 = vec(row.get("position", []))
 		var quarters: int = posmod(roundi(float(row.get("rotation_y", 0.0)) / (PI * 0.5)), 4)
@@ -324,6 +325,7 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 		match kind:
 			"mine": building = game.factory_mine
 			"smelter": building = game.factory_smelter
+			"workshop": building = game.factory_workshop
 			"center": building = game.town_hall
 			"forester": building = game.foresters[game.foresters.size() - 1]
 			"solar": building = game.solar_arrays[game.solar_arrays.size() - 1]
