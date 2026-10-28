@@ -15,6 +15,7 @@ const MAX_METAL: int = 40
 
 var power_enabled: bool = false
 var production_paused: bool = false
+var production_priority: int = 90
 var cycles_remaining: int = -1
 var input_buffer = INVENTORY.new("factory:smelter:input")
 var output_buffer = INVENTORY.new("factory:smelter:output")
@@ -139,7 +140,7 @@ func to_dict() -> Dictionary:
 		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated,
 		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict(),
 		"total_smelted": total_smelted, "production_paused": production_paused,
-		"cycles_remaining": cycles_remaining}
+		"cycles_remaining": cycles_remaining, "production_priority": production_priority}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -155,4 +156,5 @@ func from_dict(data: Dictionary) -> void:
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
 	total_smelted = maxi(0, int(data.get("total_smelted", 0)))
 	production_paused = bool(data.get("production_paused", false))
+	production_priority = clampi(int(data.get("production_priority", 90)), 0, 200)
 	cycles_remaining = maxi(-1, int(data.get("cycles_remaining", -1)))
