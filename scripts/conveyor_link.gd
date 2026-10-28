@@ -289,9 +289,13 @@ func to_dict() -> Dictionary:
 		route.append([point.x, point.y, point.z])
 	var cargo: Array = []
 	for packet in packets:
-		cargo.append({"distance": float(packet["distance"]),
-			"amount": int(packet["amount"]), "resource_type": "iron_ore" if mode == "ore" else "metal"})
-	return {"save_id": str(get_meta("save_id", "belt:" + mode)), "mode": mode,
+		var d: float = float(packet["distance"])
+		cargo.append({"distance": d, "amount": int(packet["amount"]),
+			"resource_type": "iron_ore" if mode == "ore" else "metal",
+			"direction": "forward",
+			"delivery_state": "blocked_at_destination" if d >= route_length - 0.001 else "in_transit"})
+	return {"save_id": str(get_meta("save_id", "belt:" + mode)),
+		"type_id": "conveyor:" + mode, "object_version": 1, "mode": mode,
 		"path_points": route, "packets": cargo, "elapsed": elapsed,
 		"total_transferred": total_transferred}
 
