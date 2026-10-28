@@ -29,7 +29,8 @@ func to_dict(game: Node3D) -> Dictionary:
 		if not is_instance_valid(resource):
 			continue
 		var p: Vector3 = resource.global_position
-		_id(resource, "resource:%s:%d:%d" % [resource.resource_type, roundi(p.x * 10.0), roundi(p.z * 10.0)])
+		var stable_id: String = "deposit:" + resource.name if resource.name in RESOURCE_NAMES else "resource:%s:%d:%d" % [resource.resource_type, roundi(p.x * 10.0), roundi(p.z * 10.0)]
+		_id(resource, stable_id)
 		var record: Dictionary = resource.to_dict()
 		record["node_name"] = resource.name
 		resources.append(record)
@@ -40,10 +41,6 @@ func to_dict(game: Node3D) -> Dictionary:
 		var hidden: Dictionary = iron.to_dict()
 		hidden["node_name"] = "IronOreDeposit"
 		resources.append(hidden)
-	for item in resources:
-		if item["node_name"] in RESOURCE_NAMES:
-			item["save_id"] = "deposit:" + str(item["node_name"])
-
 	var structures: Array = []
 	var groups: Dictionary = {
 		"mine": [game.factory_mine], "smelter": [game.factory_smelter],
