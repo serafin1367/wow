@@ -1884,6 +1884,13 @@ func _is_tree_planting_site_clear(spot: Vector2, hut: StaticBody3D) -> bool:
 		return false
 	if not navigation.is_circle_walkable(spot, 1.8):
 		return false
+	# Terraformacja nie moze zarastac i blokowac wybrukowanych drog.
+	if roads != null:
+		for x in range(floori(spot.x - 1.8), ceili(spot.x + 1.8) + 1):
+			for z in range(floori(spot.y - 1.8), ceili(spot.y + 1.8) + 1):
+				if Vector2(float(x), float(z)).distance_squared_to(spot) <= 1.8 * 1.8:
+					if roads.has_cell(Vector2i(x, z)):
+						return false
 	if _ground_distance(location, DEPOT_POSITION) < DEPOT_BLOCK_RADIUS + 2.8:
 		return false
 	if _ground_distance(location, LANDER_POSITION) < 6.6:
