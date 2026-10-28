@@ -1051,7 +1051,12 @@ func _try_place_energy_build(screen_position: Vector2) -> void:
 		solar_arrays.append(building)
 	else:
 		battery_banks.append(building)
-	energy_build_kind = ""
+	var can_repeat: bool = sticky_build_enabled and _can_afford(cost)
+	if kind == "solar":
+		can_repeat = can_repeat and solar_arrays.size() < MAX_SOLAR_ARRAYS
+	else:
+		can_repeat = can_repeat and battery_banks.size() < MAX_BATTERIES
+	energy_build_kind = kind if can_repeat else ""
 	_update_factory_power()
 	_update_action_buttons()
 	_set_status("Zainstalowano %s. Przewod podlaczony do sieci statku." % ("panel sloneczny" if kind == "solar" else "akumulator"))
@@ -1837,7 +1842,7 @@ func _try_place_forester(screen_position: Vector2) -> void:
 	add_child(hut)
 	foresters.append(hut)
 	navigation.block_circle(Vector2(site.x, site.z), FORESTER_RADIUS)
-	forester_build_mode = false
+	forester_build_mode = sticky_build_enabled and foresters.size() < MAX_FORESTERS and _can_afford(FORESTER_COST)
 	_set_status("Lesniczowka gotowa! Co 8 s szuka miejsca na sadzonke.")
 	_update_action_buttons()
 
