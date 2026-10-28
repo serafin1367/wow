@@ -65,3 +65,22 @@ func describe_cost(cost_lookup: Callable) -> String:
 		if int(total.get(resource_type, 0)) > 0:
 			pieces.append("%s %d" % [resource_type, int(total[resource_type])])
 	return ", ".join(pieces)
+
+
+func to_dict() -> Dictionary:
+	var serialized: Array = []
+	for entry in entries:
+		var p: Vector3 = entry["site"]
+		serialized.append({"kind": str(entry["kind"]), "site": [p.x, p.y, p.z],
+			"quarters": int(entry["quarters"])})
+	return {"save_id": "blueprints", "entries": serialized}
+
+
+func from_dict(data: Dictionary) -> void:
+	clear_plan()
+	for entry in data.get("entries", []):
+		var xyz = entry.get("site", [])
+		if xyz is Array and xyz.size() == 3:
+			add_blueprint(str(entry.get("kind", "")),
+				Vector3(float(xyz[0]), float(xyz[1]), float(xyz[2])),
+				int(entry.get("quarters", 0)))
