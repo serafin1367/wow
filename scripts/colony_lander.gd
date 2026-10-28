@@ -193,3 +193,12 @@ func _material(color: Color, glowing: bool = false) -> StandardMaterial3D:
 	if glowing:
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return mat
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": "lander", "health": health}
+
+
+func from_dict(data: Dictionary) -> void:
+	health = clampf(float(data.get("health", health)), 0.0, 100.0)
+	_refresh_label()
