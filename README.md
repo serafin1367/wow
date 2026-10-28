@@ -4,6 +4,75 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.9 — rozbudowa sieci energetycznej i pracujace maszyny
+
+Ta aktualizacja dodaje budowane instalacje energetyczne i animacje
+przemyslowe. Zachowane zostaly Mars / Ziemia / Kepler, rakieta,
+roboty, huta, kopalnia i transport tasmociagami.
+
+### Nowe konstrukcje
+
+| Obiekt | Sterowanie | Materialy | Parametry |
+|---|---|---|---|
+| Obrotowy panel PV | **V**, nastepnie LPM | 8 metalu + 5 kamienia | +4 kW generacji |
+| Magazyn energii | **K**, nastepnie LPM | 12 metalu + 8 kamienia | 8 kWh pojemnosci, max 3 kW ladowanie/rozladowanie |
+
+**Uzycie:** wybierz budynek z klawiatury lub nowego rzedu
+przyciskow w dolnym panelu. Wskaz wolny teren LPM. Mozna postawic
+do 5 paneli i 3 akumulatorow. Esc lub PPM anuluje budowe.
+Nowy budynek otrzymuje widoczny kabel zasilajacy polaczony z rakieta.
+
+**Bilans energetyczny:** istnieje jedna siec kolonii, do ktorej
+nowe budowle dolaczaja sie automatycznie. Produkcja z rakiety
+(12 kW * jej sprawnosc) sumuje sie z produkcja paneli (+4 kW kazdy).
+Stacja ladowania zachowuje priorytet poboru 4 kW, nastepnie
+kopalnia 1.5 kW, huta 2.5 kW i tasmy 0.15 kW na sztuke.
+Gdy energii brakuje, bank moze rozladowac zapas z moca do 3 kW.
+Gdy produkcja przewyzsza pobor, magazyn laduje sie z nadwyzki.
+Dla zauwazalnej rozgrywki **1 sekunda w grze = 1 minuta
+symulowanego magazynowania energii** (8 kWh nie laduje sie
+w czasie rzeczywistym). Magazyn zaczyna pusty.
+HUD wyswietla moc zrodel, rezerwe oraz poziom energii w bateriach.
+
+### Ruch i efekty wizualne
+
+- **Panel PV** obraca sie w poziomie i zmienia kat nachylenia,
+  symulujac dwie osie sledzenia slonca. Mechanizm wykorzystuje
+  nasz model Godot oraz element Kenney Factory Kit.
+- **Kopalnia** ma wirujaca glowice wiertnicza i ruch posuwisto-zwrotny
+  tylko przy dostepnej energii i niewyczerpanym zlozu.
+- **Huta** ma wirujacy wentylator i kilkanascie lecacych iskierek
+  nad paleniskiem. Iskry pojawiaja sie **tylko podczas przetapiania**.
+- **Kable** sa polozone na powierzchni i maja ruchome turkusowe
+  impulsy swiatla. Nie tworza przeszkod dla robotow.
+- Do modeli kopalni, huty i energetyki dodano oryginalne detale
+  **Kenney Factory Kit CC0** z folderu `assets/kenney/factory/`.
+
+W scenie `scenes/asset_showroom.tscn` (otworz i uruchom **F6**)
+znajdziesz obrotowy panel, magazyn energii, kabel oraz pracujacy
+wiertak i hute z iskrami.
+
+### Test gry
+
+1. `git pull origin main`, uruchom Godot i gre przez **F5**.
+2. Zbuduj kopalnie (M) i hute (H), poczekaj na pierwsze sztabki metalu.
+3. Gdy bedzie co najmniej **8 metalu i 5 kamienia**, nacisnij **V**,
+   kliknij teren i obserwuj ruch PV. Moc na HUD powinna wzrosnac
+   o 4 kW.
+4. Gdy bedzie **12 metalu i 8 kamienia**, nacisnij **K**,
+   kliknij teren i obserwuj wzrost poziomu magazynu.
+5. Obejrzyj dzialajaca hute z bliska obracajac kamere **Q/E**
+   i przyblizajac kolkiem myszy.
+
+**Zakres prototypu:** kable sa widoczne, ale nie ma jeszcze
+edytora recznego okablowania, lokalnych awarii przewodow ani
+dnia/nocy wplywajacego na uzysk z PV. Silniki i iskry sa
+autorskimi animacjami Godot bez pobierania efektow z zewnatrz.
+
+Nowe skrypty: `solar_array.gd`, `battery_bank.gd`,
+`power_cable.gd`, `industrial_fx.gd`; test:
+`tests/power_grid_smoke.gd`.
+
 ## WOW 0.8 — polaczenia od maszyny do maszyny, rolety i reczne trasy
 
 Wersja poprawia przede wszystkim **czytelnosc logistyczna** fabryki.
