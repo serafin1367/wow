@@ -86,6 +86,8 @@ var grid_consumption_kw: float = 0.0
 var battery_draw_kw: float = 0.0
 var build_preview = null
 var preview_elapsed: float = 0.0
+var placement_rotation_quarters: int = 0
+var placement_snap_size: int = 1
 
 
 func _ready() -> void:
@@ -444,12 +446,48 @@ func _mine_resource():
 	return resource
 
 
+func _snap_build_point(point: Vector3, kind: String = "") -> Vector3:
+	# Kopalnia ma jedyny dozwolony punkt montazu: centrum zloza.
+	if kind == "mine":
+		var source = _mine_resource()
+		if source != null:
+			return source.global_position
+	var size: float = float(placement_snap_size)
+	return Vector3(roundf(point.x / size) * size, 0.0, roundf(point.z / size) * size)
+
+
+func _rotate_build_preview(backward: bool = false) -> void:
+	if _active_build_kind() == "":
+		return
+	placement_rotation_quarters = posmod(placement_rotation_quarters + (-1 if backward else 1), 4)
+	preview_elapsed = 1.0
+	_update_build_preview(0.0)
+
+
+func _cycle_build_snap() -> void:
+	if _active_build_kind() == "":
+		return
+	match placement_snap_size:
+		1:
+			placement_snap_size = 2
+		2:
+			placement_snap_size = 4
+		_:
+			placement_snap_size = 1
+	preview_elapsed = 1.0
+	_update_build_preview(0.0)
+
+
+func _apply_build_rotation(building: Node3D) -> void:
+	building.rotation.y = float(placement_rotation_quarters) * PI * 0.5
+
+
 func _build_site_at_mouse(screen_position: Vector2, kind: String) -> Dictionary:
 	var ground_hit: Dictionary = _raycast(screen_position, 1)
 	if ground_hit.is_empty():
 		return {}
 	var point: Vector3 = ground_hit["position"]
-	var site := Vector3(roundf(point.x), 0.0, roundf(point.z))
+	var site: Vector3 = _snap_build_point(point, kind)
 	if kind == "mine":
 		var source = _mine_resource()
 		if source == null:
@@ -555,11 +593,13 @@ func _update_build_preview(delta: float) -> void:
 	var site: Vector3 = hit["site"]
 	build_preview.update_area(
 		site, _build_radius(kind), _can_place_structure_at(site, kind),
-		Callable(self, "_build_grid_cell_free").bind(kind)
+		Callable(self, "_build_grid_cell_free").bind(kind),
+		kind, placement_rotation_quarters, placement_snap_size
 	)
 
 
 func _cancel_build_modes() -> void:
+	placement_rotation_quarters = 0
 	energy_build_kind = ""
 	_cancel_manual_conveyor()
 	build_mode = false
@@ -596,6 +636,7 @@ func _try_place_mine(screen_position: Vector2) -> void:
 	factory_mine = MINE_SCRIPT.new()
 	factory_mine.ore_source = source
 	factory_mine.position = source.global_position
+	_apply_build_rotation(factory_mine)
 	add_child(factory_mine)
 	_connect_power_node(factory_mine)
 	# Zloze zachowuje ilosc surowca, ale wydobywa je tylko ekstraktor.
@@ -632,7 +673,7 @@ func _try_place_smelter(screen_position: Vector2) -> void:
 		_set_status("Postaw hute na gruncie.")
 		return
 	var hit_pos: Vector3 = hit["position"]
-	var site := Vector3(roundf(hit_pos.x), 0.0, roundf(hit_pos.z))
+	var site: Vector3 = _snap_build_point(hit_pos, "smelter")
 	if not _is_smelter_site_clear(site):
 		_set_status("Huta nie zmiesci sie tutaj: odsun ja od przeszkod.")
 		return
@@ -641,6 +682,7 @@ func _try_place_smelter(screen_position: Vector2) -> void:
 		return
 	factory_smelter = SMELTER_SCRIPT.new()
 	factory_smelter.position = site
+	_apply_build_rotation(factory_smelter)
 	add_child(factory_smelter)
 	_connect_power_node(factory_smelter)
 	navigation.block_circle(Vector2(site.x, site.z), SMELTER_RADIUS)
@@ -685,7 +727,7 @@ func _try_place_energy_build(screen_position: Vector2) -> void:
 		_set_status("Wybierz wolny grunt.")
 		return
 	var where: Vector3 = hit["position"]
-	var at := Vector3(roundf(where.x), 0.0, roundf(where.z))
+	var at: Vector3 = _snap_build_point(where, energy_build_kind)
 	var kind: String = energy_build_kind
 	var radius: float = SOLAR_SCRIPT.CLEARANCE_RADIUS if kind == "solar" else BATTERY_SCRIPT.CLEARANCE_RADIUS
 	if not _is_energy_site_clear(at, radius):
@@ -697,6 +739,7 @@ func _try_place_energy_build(screen_position: Vector2) -> void:
 		return
 	var building = SOLAR_SCRIPT.new() if kind == "solar" else BATTERY_SCRIPT.new()
 	building.position = at
+	_apply_build_rotation(building)
 	add_child(building)
 	navigation.block_circle(Vector2(at.x, at.z), radius)
 	_connect_power_node(building)
@@ -1092,6 +1135,12 @@ func _charge_selected() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R and _active_build_kind() != "":
+			_rotate_build_preview(event.shift_pressed)
+			return
+		if event.keycode == KEY_G and _active_build_kind() != "":
+			_cycle_build_snap()
+			return
 		if event.keycode == KEY_B:
 			_toggle_build_mode()
 			return
@@ -1372,7 +1421,7 @@ func _try_place_town_hall(screen_position: Vector2) -> void:
 		_set_status("Wskaz teren na mapie, aby zbudowac ratusz.")
 		return
 	var point: Vector3 = hit["position"]
-	var site := Vector3(roundf(point.x), 0.0, roundf(point.z))
+	var site: Vector3 = _snap_build_point(point, "center")
 	if not _is_build_site_clear(site):
 		_set_status("Brak miejsca: odsun ratusz od jednostek, magazynu i zloz.")
 		return
@@ -1383,6 +1432,7 @@ func _try_place_town_hall(screen_position: Vector2) -> void:
 
 	town_hall = TOWN_HALL_SCRIPT.new()
 	town_hall.position = site
+	_apply_build_rotation(town_hall)
 	add_child(town_hall)
 	navigation.block_circle(Vector2(site.x, site.z), TOWN_HALL_RADIUS)
 	build_mode = false
@@ -1420,7 +1470,7 @@ func _try_place_forester(screen_position: Vector2) -> void:
 		_set_status("Kliknij wolny teren na mapie.")
 		return
 	var location: Vector3 = hit["position"]
-	var site := Vector3(roundf(location.x), 0.0, roundf(location.z))
+	var site: Vector3 = _snap_build_point(location, "forester")
 	if not _is_forester_site_clear(site):
 		_set_status("Brak miejsca na lesniczowke. Wybierz inne miejsce.")
 		return
@@ -1430,6 +1480,7 @@ func _try_place_forester(screen_position: Vector2) -> void:
 		return
 	var hut = FORESTER_SCRIPT.new()
 	hut.position = site
+	_apply_build_rotation(hut)
 	hut.plant_requested.connect(_on_forester_plant_request)
 	add_child(hut)
 	foresters.append(hut)
