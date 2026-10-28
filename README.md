@@ -4,6 +4,52 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.11 — hologram modelu 3D, obroty i modularna siatka budowy
+
+Po wybraniu konstrukcji (B centrum, L rekultywacja, M kopalnia,
+H huta, V panel PV, K bateria) widac teraz **prawdziwy, polprzezroczysty
+model 3D budynku** pod kursorem, na lokalnej zielono-czerwonej siatce.
+
+- **Zielony hologram i obrys**: mozna postawic budynek.
+- **Czerwony hologram i obrys**: caly budynek nie miesci sie,
+  koliduje z istniejacymi obiektami lub granica mapy.
+- **R**: obrot o 90 stopni zgodnie z ruchem wskazowek zegara.
+- **Shift+R**: obrot o 90 stopni w druga strone.
+- **G**: zmiana siatki przyciagania **1 m -> 2 m -> 4 m -> 1 m**.
+- **LPM**: zatwierdzenie budowy po sprawdzeniu zajetosci terenu.
+- **Esc/PPM**: anulowanie bez pobrania zasobow.
+
+Obrot dotyczy rzeczywistego modelu i jego fizycznej kolizji,
+a budynek otrzymuje dokladnie taka sama orientacje jak hologram.
+Kolo rezerwacji terenu wokol budynku pozostaje konserwatywne,
+niezalezne od jego obrotu, by zachowac bezpieczenstwo nawigacji robotow.
+
+Podglad nie posiada warstwy kolizji, nie uruchamia
+produkcji, timerow rekultywacji ani animacji.
+W miejscu budowy tworzony jest prawdziwy budynek dopiero po
+potwierdzeniu, wiec system gospodarki pozostaje bez zmian.
+
+**Wyjatek:** kopalnia ma stala lokalizacje na zlozu zelaza,
+nie mozna przesunac jej poza to zloze przez zmiane siatki G;
+orientacje (R) nadal mozna wybrac.
+
+Kod: `scripts/building_ghost.gd`,
+`scripts/build_placement_preview.gd`,
+`scripts/main.gd`.
+Test integracyjny: `tests/building_ghost_smoke.gd` sprawdza
+6 rodzajow hologramow, brak kolizji i wydatkow, obroty i przyciaganie.
+
+### Proponowany test w Godocie
+
+1. `git pull origin main`, a po zakonczeniu importu uruchom F5.
+2. Nacisnij V. Przesuwaj kursor z wolnego terenu nad magazyn:
+   model i obrys maja zmienic kolor z zielonego na czerwony.
+3. Nacisnij R, potem Shift+R — obserwuj obrot panelu.
+4. Nacisnij G dwa razy — sprawdz, czy konstrukcja przesuwa
+   sie po siatce 2 m, a potem 4 m.
+5. Kliknij LPM w wolnym miejscu i obejrzyj gotowy, obrocony panel.
+6. Powtorz z H (huta), K (bateria) i B (centrum).
+
 ## WOW 0.10 — bezpieczne stawianie budynkow: siatka przy kursorze
 
 W trybie budowania pojawia sie **lokalna, polprzezroczysta siatka 17x17 pol**
