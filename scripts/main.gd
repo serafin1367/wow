@@ -585,13 +585,10 @@ func _toggle_mine_mode() -> void:
 
 
 func _try_place_mine(screen_position: Vector2) -> void:
-	var hit := _raycast(screen_position, 4)
-	if hit.is_empty() or hit["collider"].name != "IronOreDeposit":
-		_set_status("Kopalnie stawiamy bezposrednio na zlozu ZELAZA (nie zlota).")
-		return
-	var source = hit["collider"]
-	if source.remaining <= 0 or factory_mine != null:
-		_set_status("To zloze nie jest dostepne.")
+	var hit: Dictionary = _build_site_at_mouse(screen_position, "mine")
+	var source = _mine_resource()
+	if hit.is_empty() or source == null or not _can_place_structure_at(hit["site"], "mine"):
+		_set_status("Kopalnia wymaga wolnego zloza ZELAZA bez kolizji z innymi budynkami.")
 		return
 	if not _spend_resources(MINE_COST):
 		mine_build_mode = false
@@ -655,25 +652,7 @@ func _try_place_smelter(screen_position: Vector2) -> void:
 
 
 func _is_smelter_site_clear(site: Vector3) -> bool:
-	if absf(site.x) > 42.0 or absf(site.z) > 42.0:
-		return false
-	if not navigation.is_circle_walkable(Vector2(site.x, site.z), SMELTER_RADIUS):
-		return false
-	if _ground_distance(site, DEPOT_POSITION) < SMELTER_RADIUS + DEPOT_BLOCK_RADIUS + 1.0:
-		return false
-	if _ground_distance(site, LANDER_POSITION) < SMELTER_RADIUS + 4.7:
-		return false
-	if _ground_distance(site, CHARGER_POSITION) < SMELTER_RADIUS + 2.4:
-		return false
-	if town_hall != null and _ground_distance(site, town_hall.global_position) < SMELTER_RADIUS + TOWN_HALL_RADIUS + 0.7:
-		return false
-	for building in foresters:
-		if _ground_distance(site, building.global_position) < SMELTER_RADIUS + FORESTER_RADIUS + 0.7:
-			return false
-	for worker in workers:
-		if _ground_distance(site, worker.global_position) < SMELTER_RADIUS + 0.9:
-			return false
-	return true
+	return _can_place_structure_at(site, "smelter")
 
 
 func _connect_power_node(node: Node3D) -> void:
@@ -732,14 +711,8 @@ func _try_place_energy_build(screen_position: Vector2) -> void:
 
 
 func _is_energy_site_clear(site: Vector3, radius: float) -> bool:
-	if absf(site.x) > 43.0 or absf(site.z) > 43.0:
-		return false
-	if not navigation.is_circle_walkable(Vector2(site.x, site.z), radius):
-		return false
-	for robot in workers:
-		if _ground_distance(site, robot.global_position) < radius + 1.2:
-			return false
-	return true
+	# Parametr radius zachowany dla kompatybilnosci ze starszym API.
+	return _can_place_structure_at(site, energy_build_kind)
 
 
 func _tick_battery_grid(delta: float) -> void:
@@ -1374,10 +1347,11 @@ func _create_training_timer() -> void:
 
 
 func _toggle_build_mode() -> void:
-	mine_build_mode = false
-	smelter_build_mode = false
-	if forester_build_mode:
-		forester_build_mode = false
+	var was_active: bool = build_mode
+	_cancel_build_modes()
+	if was_active:
+		_set_status("Anulowano budowe centrum.")
+		return
 	if town_hall != null:
 		_set_status("Centrum dowodzenia juz istnieje. Mozesz produkowac roboty.")
 		return
@@ -1417,24 +1391,7 @@ func _try_place_town_hall(screen_position: Vector2) -> void:
 
 
 func _is_build_site_clear(site: Vector3) -> bool:
-	if absf(site.x) > 42.0 or absf(site.z) > 42.0:
-		return false
-	if _ground_distance(site, DEPOT_POSITION) < TOWN_HALL_RADIUS + 4.0:
-		return false
-	for source in get_tree().get_nodes_in_group("resource_nodes"):
-		if (source.remaining > 0 or source.is_sapling) and _ground_distance(site, source.global_position) < TOWN_HALL_RADIUS + source.clearance_radius + 0.5:
-			return false
-	if _ground_distance(site, LANDER_POSITION) < TOWN_HALL_RADIUS + 4.5:
-		return false
-	if _ground_distance(site, CHARGER_POSITION) < TOWN_HALL_RADIUS + 3.0:
-		return false
-	for worker in workers:
-		if _ground_distance(site, worker.global_position) < TOWN_HALL_RADIUS + 0.5:
-			return false
-	for hut in foresters:
-		if _ground_distance(site, hut.global_position) < TOWN_HALL_RADIUS + FORESTER_RADIUS + 0.7:
-			return false
-	return true
+	return _can_place_structure_at(site, "center")
 
 
 func _ground_distance(a: Vector3, b: Vector3) -> float:
@@ -1442,12 +1399,9 @@ func _ground_distance(a: Vector3, b: Vector3) -> float:
 
 
 func _toggle_forester_mode() -> void:
-	mine_build_mode = false
-	smelter_build_mode = false
-	if build_mode:
-		build_mode = false
-	if forester_build_mode:
-		forester_build_mode = false
+	var was_active: bool = forester_build_mode
+	_cancel_build_modes()
+	if was_active:
 		_set_status("Anulowano budowe lesniczowki.")
 		return
 	if foresters.size() >= MAX_FORESTERS:
@@ -1486,28 +1440,7 @@ func _try_place_forester(screen_position: Vector2) -> void:
 
 
 func _is_forester_site_clear(site: Vector3) -> bool:
-	if absf(site.x) > 42.0 or absf(site.z) > 42.0:
-		return false
-	if not navigation.is_circle_walkable(Vector2(site.x, site.z), FORESTER_RADIUS):
-		return false
-	if _ground_distance(site, DEPOT_POSITION) < FORESTER_RADIUS + DEPOT_BLOCK_RADIUS + 1.0:
-		return false
-	if _ground_distance(site, LANDER_POSITION) < FORESTER_RADIUS + 4.5:
-		return false
-	if _ground_distance(site, CHARGER_POSITION) < FORESTER_RADIUS + 3.0:
-		return false
-	if town_hall != null and _ground_distance(site, town_hall.global_position) < FORESTER_RADIUS + TOWN_HALL_RADIUS + 1.0:
-		return false
-	for hut in foresters:
-		if _ground_distance(site, hut.global_position) < FORESTER_RADIUS * 2.0 + 1.0:
-			return false
-	for source in get_tree().get_nodes_in_group("resource_nodes"):
-		if (source.remaining > 0 or source.is_sapling) and _ground_distance(site, source.global_position) < FORESTER_RADIUS + source.clearance_radius + 1.0:
-			return false
-	for worker in workers:
-		if _ground_distance(site, worker.global_position) < FORESTER_RADIUS + 0.6:
-			return false
-	return true
+	return _can_place_structure_at(site, "forester")
 
 
 func _on_forester_plant_request(hut) -> void:
