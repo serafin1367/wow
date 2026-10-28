@@ -87,3 +87,16 @@ func describe() -> String:
 	return "%s | Ruda: %d/%d | Metal: %d/%d | %.1f kW" % [
 		status, ore_stock, MAX_ORE, metal_stock, MAX_METAL, POWER_KW
 	]
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "position":
+		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
+		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	ore_stock = clampi(int(data.get("ore_stock", 0)), 0, MAX_ORE)
+	metal_stock = clampi(int(data.get("metal_stock", 0)), 0, MAX_METAL)
+	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
