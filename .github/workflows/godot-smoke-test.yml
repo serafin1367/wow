@@ -172,6 +172,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|RECOVERY TEST:' /tmp/wow-logistics-recovery.log; then
             exit 1
           fi
+      - name: Test atomic rerouting of loaded hauler cargo
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path . --script res://tests/logistics_redirect_smoke.gd 2>&1 | tee /tmp/wow-redirect.log
+          grep -F 'LOGISTICS REDIRECT SMOKE OK' /tmp/wow-redirect.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|REDIRECT TEST:' /tmp/wow-redirect.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
