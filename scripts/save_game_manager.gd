@@ -35,7 +35,7 @@ func to_dict(game: Node3D) -> Dictionary:
 		var record: Dictionary = resource.to_dict()
 		# Godot automatycznie zmienia nazwy rodzenstwa Tree na Tree2 / @...;
 		# logiczny typ zrodla nie moze zalezec od nazwy Node.
-		record["node_name"] = "Tree" if resource.resource_type == "wood" else resource.name
+		record["node_name"] = "Tree" if resource.resource_type == "wood" else str(resource.name)
 		record["type_id"] = "resource:" + resource.resource_type
 		record["object_version"] = 1
 		resources.append(record)
