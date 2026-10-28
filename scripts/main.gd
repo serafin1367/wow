@@ -68,6 +68,7 @@ var depot_build_mode: bool = false
 var logistics_depots: Array = []
 var logistics_manager = LOGISTICS_MANAGER.new()
 var production_monitor = PRODUCTION_MONITOR.new()
+var production_ui_elapsed: float = 0.0
 var logistics_elapsed: float = 0.0
 var foresters: Array = []
 var build_mode: bool = false
@@ -1519,6 +1520,110 @@ func _redirect_logistics_job(job_id: String, destination_id: String) -> void:
 	_refresh_logistics_panel()
 
 
+func _production_machine(kind: String):
+	match kind:
+		"mine": return factory_mine
+		"smelter": return factory_smelter
+	return null
+
+
+func _production_snapshot() -> Dictionary:
+	var report: Dictionary = production_monitor.report(factory_mine, factory_smelter)
+	var busy: int = 0
+	var charging: int = 0
+	var idle: int = 0
+	var haulers: int = 0
+	for worker in workers:
+		if worker.robot_role == "hauler":
+			haulers += 1
+		if worker.state == worker.WorkState.CHARGING or worker.state == worker.WorkState.TO_CHARGER:
+			charging += 1
+		elif worker.state == worker.WorkState.IDLE:
+			idle += 1
+		else:
+			busy += 1
+	var machines: Array[Dictionary] = []
+	var alarms: Array[Dictionary] = []
+	if factory_mine != null:
+		machines.append({
+			"kind": "mine", "name": "KOPALNIA ZELAZA", "status": report["mine_status"],
+			"recipe": "Zloze rudy -> %d rudy / %.1f s | %0.1f kW" % [factory_mine.RATE, factory_mine.CYCLE_SECONDS, factory_mine.POWER_KW],
+			"buffers": "WYJ: %d/%d rudy" % [factory_mine.stock, factory_mine.MAX_BUFFER],
+			"progress": report["mine_progress"],
+			"paused": factory_mine.production_paused,
+			"cycles_remaining": factory_mine.cycles_remaining})
+		if not str(report["mine_status"]) in ["PRACUJE", "WSTRZYMANA", "ZLECENIE WYKONANE"]:
+			alarms.append({"kind": "mine", "message": "KOPALNIA: " + str(report["mine_status"])})
+	if factory_smelter != null:
+		machines.append({
+			"kind": "smelter", "name": "HUTA METALU", "status": report["smelter_status"],
+			"recipe": "%d rudy -> 1 metal / %.1f s | %.1f kW" % [factory_smelter.ORE_PER_METAL, factory_smelter.CYCLE_SECONDS, factory_smelter.POWER_KW],
+			"buffers": "WEJ: %d/%d rudy | WYJ: %d/%d metalu" % [
+				factory_smelter.ore_stock, factory_smelter.MAX_ORE,
+				factory_smelter.metal_stock, factory_smelter.MAX_METAL],
+			"progress": report["smelter_progress"],
+			"paused": factory_smelter.production_paused,
+			"cycles_remaining": factory_smelter.cycles_remaining})
+		if not str(report["smelter_status"]) in ["PRACUJE", "WSTRZYMANA", "ZLECENIE WYKONANE"]:
+			alarms.append({"kind": "smelter", "message": "HUTA: " + str(report["smelter_status"])})
+		if haulers == 0 and ore_conveyor == null and factory_smelter.ore_stock < factory_smelter.ORE_PER_METAL:
+			if factory_mine != null and factory_mine.stock > 0:
+				alarms.append({"kind": "smelter", "message": "BRAK TRANSPORTOWCA LUB TASMY Z RUDA"})
+	return {
+		"ore_per_min": report["ore_per_min"],
+		"metal_per_min": report["metal_per_min"],
+		"ore_consumed_per_min": report["ore_consumed_per_min"],
+		"resources": resource_totals.duplicate(true),
+		"busy_robots": busy, "charging_robots": charging, "idle_robots": idle,
+		"job_count": logistics_manager.jobs.size(),
+		"machines": machines, "alarms": alarms}
+
+
+func _toggle_production_panel() -> void:
+	if hud != null and hud.toggle_production_panel():
+		_refresh_production_panel()
+
+
+func _refresh_production_panel() -> void:
+	if hud != null:
+		hud.refresh_production_panel(_production_snapshot())
+
+
+func _toggle_machine_pause(kind: String) -> void:
+	var machine = _production_machine(kind)
+	if not is_instance_valid(machine):
+		return
+	machine.production_paused = not machine.production_paused
+	_update_factory_power()
+	_set_status("%s: %s" % [kind, "PAUZA" if machine.production_paused else "WZNOWIONO"])
+	_refresh_production_panel()
+
+
+func _set_machine_queue(kind: String, cycles: int) -> void:
+	var machine = _production_machine(kind)
+	if not is_instance_valid(machine):
+		return
+	machine.set_production_target(cycles)
+	_update_factory_power()
+	_set_status("%s: %s" % [kind, "produkcja ciagla" if cycles == -1 else "%d cykli" % cycles])
+	_refresh_production_panel()
+
+
+func _focus_production_machine(kind: String) -> void:
+	var machine = _production_machine(kind)
+	if not is_instance_valid(machine):
+		_set_status("Nie ma jeszcze maszyny: " + kind)
+		return
+	_clear_selection()
+	selected_structure = machine
+	var rig := get_node_or_null("RTSCameraRig")
+	if rig != null:
+		rig.position.x = clampf(machine.global_position.x, -45.0, 45.0)
+		rig.position.z = clampf(machine.global_position.z, -45.0, 45.0)
+	_set_status("Wskazano na mapie: %s" % kind)
+	_update_colony_hud()
+
+
 func _create_hud() -> void:
 	hud = HUD_SCRIPT.new()
 	hud.name = "ColonyHUD"
@@ -1541,6 +1646,11 @@ func _create_hud() -> void:
 	hud.logistics_priority_requested.connect(_set_logistics_priority)
 	hud.logistics_cancel_requested.connect(_cancel_logistics_job)
 	hud.logistics_redirect_requested.connect(_redirect_logistics_job)
+	hud.production_open_requested.connect(_toggle_production_panel)
+	hud.production_refresh_requested.connect(_refresh_production_panel)
+	hud.production_pause_requested.connect(_toggle_machine_pause)
+	hud.production_queue_requested.connect(_set_machine_queue)
+	hud.production_focus_requested.connect(_focus_production_machine)
 	hud.planning_requested.connect(_toggle_planning)
 	hud.sticky_requested.connect(_toggle_sticky_build)
 	hud.commit_plan_requested.connect(_confirm_blueprints)
@@ -1563,6 +1673,11 @@ func _create_hud() -> void:
 
 func _process(delta: float) -> void:
 	production_monitor.capture(factory_mine, factory_smelter, delta)
+	production_ui_elapsed += delta
+	if production_ui_elapsed >= 1.5:
+		production_ui_elapsed = 0.0
+		if hud != null and hud.production_panel != null and hud.production_panel.visible:
+			_refresh_production_panel()
 	_tick_logistics(delta)
 	_update_build_preview(delta)
 	_update_road_preview(delta)
@@ -1634,6 +1749,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.ctrl_pressed and event.keycode == KEY_O:
 			_load_game()
+			return
+		if event.keycode == KEY_V and not event.ctrl_pressed:
+			_toggle_production_panel()
 			return
 		if event.keycode == KEY_O and not event.ctrl_pressed:
 			_toggle_logistics_panel()
