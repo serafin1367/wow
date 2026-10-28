@@ -158,7 +158,9 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 
 	game._cancel_build_modes()
 	game._clear_selection()
-	game.resource_totals = data["resources_total"].duplicate(true)
+	game.resource_totals.clear()
+	for resource_key in ["wood", "gold", "stone", "metal"]:
+		game.resource_totals[resource_key] = int(data["resources_total"][resource_key])
 
 	for old_worker in game.workers:
 		game.remove_child(old_worker)
