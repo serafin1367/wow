@@ -61,18 +61,20 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 ### WOW 0.14 — magazyny pośrednie i logistyka (P0) — **w trakcie**
 
-**Zrobione jako fundament:** `scripts/inventory.gd` — dane o stanach, limitach i rezerwacjach wejścia/wyjścia, transakcje i `to_dict()` / `from_dict()`; [test `inventory_smoke.gd` w CI](https://github.com/serafin1367/wow/actions/runs/40680932293). **Nie podłączono jeszcze** modułu do istniejących maszyn i przenośników; poniższe zadania integracyjne pozostają otwarte.
+**Zrealizowano:** magazyn pośredni `U` (do 3 budynków), magazyny/bufory `Inventory`, wspólne porty kopalni, huty, robotów i taśm, `LogisticsManager` z priorytetami, rezerwacjami i zapisem zleceń w drodze. Zobacz `tests/inventory_smoke.gd`, `tests/logistics_depot_smoke.gd`, `tests/logistics_jobs_smoke.gd` oraz `tests/save_load_smoke.gd`. **Pozostało:** interfejs użytkownika do edycji priorytetów i min./maks. zapasu, bezpieczna zmiana celu przy transporcie, pełna obsługa wszystkich magazynów i długie testy floty.
 
-- [ ] Nowy budynek: **depot logistyczny** z ograniczoną pojemnością i kilkoma typami surowca.
-- [ ] Model ekwipunku dla magazynów i maszyn: wolne miejsce, rezerwacje, pobranie, dostarczenie.
-- [ ] Zdefiniować **wspólny model portu/buforu wejścia–wyjścia (`Inventory` / `BufferPort`)** dla maszyn, magazynów, robotów i taśmociągów. Ten sam interfejs ma obsługiwać sprawdzenie pojemności, rezerwację, pobranie i przyjęcie ładunku; bez osobnych, rozbieżnych implementacji „dla robota” i „dla taśmy”.
-- [ ] Zdefiniować jednoznaczne przekazanie własności ładunku: odebrana jednostka znika z bufora źródła **dokładnie raz**, a przyjęta pojawia się w buforze celu **dokładnie raz**. Pełny bufor nie może usuwać ani duplikować ładunku pozostającego na robocie/taśmie.
-- [ ] Nadać magazynom, buforom, portom i zleceniom stabilne `save_id` oraz kontrakt `to_dict()` / `from_dict()` wdrożony w WOW 0.13.
-- [ ] Uogólnić zlecenia transportowe: **skąd → co → ile → dokąd**, zamiast sztywnej trasy kopalnia–huta.
-- [ ] Automatyczny przydział wolnego transportowca do najważniejszego zlecenia.
+- [x] Nowy budynek: **depot logistyczny** z ograniczoną pojemnością i kilkoma typami surowca.
+- [x] Model ekwipunku dla magazynów i maszyn: wolne miejsce, rezerwacje, pobranie, dostarczenie.
+- [x] Zdefiniować **wspólny model portu/buforu wejścia–wyjścia (`Inventory` / `BufferPort`)** dla maszyn, magazynów, robotów i taśmociągów. Ten sam interfejs ma obsługiwać sprawdzenie pojemności, rezerwację, pobranie i przyjęcie ładunku; bez osobnych, rozbieżnych implementacji „dla robota” i „dla taśmy”.
+- [x] Zdefiniować jednoznaczne przekazanie własności ładunku: odebrana jednostka znika z bufora źródła **dokładnie raz**, a przyjęta pojawia się w buforze celu **dokładnie raz**. Pełny bufor nie może usuwać ani duplikować ładunku pozostającego na robocie/taśmie.
+- [x] Nadać magazynom, buforom, portom i zleceniom stabilne `save_id` oraz kontrakt `to_dict()` / `from_dict()` wdrożony w WOW 0.13.
+- [x] Uogólnić zlecenia transportowe: **skąd → co → ile → dokąd**, zamiast sztywnej trasy kopalnia–huta.
+- [x] Automatyczny przydział wolnego transportowca do najważniejszego zlecenia.
 - [ ] Ustawianie priorytetów zleceń i limitów zapasu (min./maks.) dla magazynów.
 - [ ] Obsłużyć brak drogi, pełny magazyn, rozładowany robot, zmianę celu i anulowanie zlecenia.
 - [ ] Test wielu magazynów, robotów i taśmociągów korzystających z **tych samych portów**: **każda jednostka ładunku ma dokładnie jednego właściciela**. Zweryfikować również zapis/odczyt z aktywnymi rezerwacjami.
+
+**Stan na 28.10.2026:** automatyczny transfer przez *pierwszy* magazyn i jego serializacja są gotowe; test dwóch równoległych zleceń został dodany. Priorytety i limity magazynowe istnieją jako API, ale nie mają jeszcze panelu ustawień.
 
 **Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców; przełączenie odbioru z robota na taśmę **nie wymaga zmiany logiki magazynu**. Proponowane moduły: `Inventory`, `BufferPort`, `LogisticsManager`, `TransportJob`.
 
