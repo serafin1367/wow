@@ -78,19 +78,22 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 **Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców; przełączenie odbioru z robota na taśmę **nie wymaga zmiany logiki magazynu**. Proponowane moduły: `Inventory`, `BufferPort`, `LogisticsManager`, `TransportJob`.
 
-### WOW 0.15 — centrum zarządzania produkcją (P1) — **rozpoczęty**
+### WOW 0.15 — centrum zarządzania produkcją (P1) — **ukończony technicznie, do odbioru wizualnego**
 
-Pierwsza implementacja: trwałe liczniki wydobycia i przetopienia oraz `scripts/production_monitor.gd`, pomiar produkcji/min z okna 60 s, postęp cyklu, diagnoza braku energii/pełnego bufora, informacje o recepturze i wejściach/wyjściach w panelu zaznaczonego budynku. Test: `tests/production_monitor_smoke.gd`. Pozostają: pełne zużycie/min, obciążenie robotów, kolejki, alarmy z nawigacją i ręczny odbiór wizualny HUD.
+**Zrealizowano:** panel `V` z podsumowaniem gospodarki, produkcją i zużyciem/min, obciążeniem robotów, alarmami i nawigacją do maszyn. Kopalnia i huta obsługują pauzę/wznowienie, ograniczanie liczby cykli, **wiele partii oczekujących w kolejce** i priorytety produkcji oraz przydziału energii. Zapis zawiera kolejki, priorytety, stan wstrzymania, liczniki produkcji i próbki telemetrii. Górny i dolny HUD można przewijać przy wąskim oknie, a konsola dopasowuje się do rzeczywistych granic pasków.
 
+**Potwierdzenie:** `tests/production_monitor_smoke.gd`, `tests/production_console_smoke.gd`, `tests/production_queue_smoke.gd`, `tests/production_layout_smoke.gd` oraz pozostała regresja Linux/Windows: [GitHub Actions](https://github.com/serafin1367/wow/actions/runs/40702087867).
+
+**Pozostaje ręczny odbiór wizualny:** sprawdzić układ, czcionki i obsługę na Windows, zwłaszcza przy różnych ustawieniach skalowania systemu. Zaawansowana zmiana receptur to WOW 0.16.
 
 - [x] Panel wybranego budynku: wejście, wyjście, receptura, postęp cyklu, stan energii.
-- [ ] Widok całej kolonii: produkcja/min, zużycie/min, dostępne zasoby, obciążenie robotów.
-- [ ] Kolejki produkcji z możliwością pauzy i zmiany priorytetu.
-- [ ] Czytelne alarmy: brak rudy, pełny bufor, brak transportowca, brak energii.
-- [ ] Zaznaczenie i szybkie przejście do budynku wywołującego alarm.
-- [ ] Responsywny HUD: bez nakładania paneli na ekranie 1080p i przy mniejszym oknie.
+- [x] Widok całej kolonii: produkcja/min, zużycie/min, dostępne zasoby, obciążenie robotów.
+- [x] Kolejki produkcji z możliwością pauzy i zmiany priorytetu.
+- [x] Czytelne alarmy: brak rudy, pełny bufor, brak transportowca, brak energii.
+- [x] Zaznaczenie i szybkie przejście do budynku wywołującego alarm.
+- [x] Responsywny HUD: bez nakładania paneli na ekranie 1080p i przy mniejszym oknie.
 
-**Kryterium ukończenia:** gracz potrafi z poziomu HUD wskazać, dlaczego fabryka przestała produkować.
+**Kryterium ukończenia — spełnione automatycznie:** gracz widzi powody przestoju i może wskazać odpowiadający budynek z panelu. Test wizualny pozostaje do wykonania po pobraniu wersji na Windows.
 
 ### WOW 0.16 — receptury i rozszerzona gospodarka (P1)
 
@@ -202,6 +205,6 @@ Wersję 1.0 uznajemy za gotową, jeżeli spełnia **wszystkie** warunki:
 
 ---
 
-**Ostatnie wykonanie:** 28.10.2026 — WOW 0.14: panel i zlecenia logistyczne, przekierowanie aktywnego ładunku, test 20 robotów; CI Linux + Windows: https://github.com/serafin1367/wow/actions/runs/40689835635.
+**Ostatnie wykonanie:** 28.10.2026 — WOW 0.15: panel produkcyjny, wiele partii produkcyjnych, priorytety zasilania, alerty i test responsywności. CI Linux + Windows: https://github.com/serafin1367/wow/actions/runs/40702087867. **Następny etap:** WOW 0.16 — rejestr receptur i drugi łańcuch produkcyjny.
 
 **Zarządzanie planem:** po zakończeniu każdego etapu oznaczać zadania `[x]`, dopisywać link do commita lub testu i aktualizować priorytety. Nie oznaczać funkcji jako gotowej wyłącznie na podstawie utworzonego pliku — wymagane jest działanie w grze i test.
