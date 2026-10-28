@@ -4,6 +4,39 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.10 — bezpieczne stawianie budynkow: siatka przy kursorze
+
+W trybie budowania pojawia sie **lokalna, polprzezroczysta siatka 17x17 pol**
+bezposrednio wokol kursora, nad powierzchnia planety.
+
+- **Zielone pola:** teren wolny od kolizji i przeszkod.
+- **Czerwone pola:** juz zajety teren albo obszar poza mapa.
+- **Zielony okrag / WOLNE MIEJSCE:** caly obrys wybranego budynku
+  zmiesci sie na wskazanym stanowisku.
+- **Czerwony okrag / ZAJETE / NIEDOSTEPNE:** nie mozna tutaj budowac.
+  Przy kliknieciu nie sa pobierane materialy.
+- Siatka aktualizuje sie przy przesuwaniu myszy; znika po zbudowaniu
+  konstrukcji, anulowaniu Esc/PPM lub opuszczeniu trybu budowania.
+
+Ograniczenie zajetosci jest **wspolne dla wszystkich konstrukcji**:
+centrum dowodzenia (B), modul rekultywacji (L), huta (H),
+panel sloneczny (V), akumulator (K) i kopalnia (M). Walidacja uwzglednia
+caly obrys z marginesem, drzewa, zloza, magazyn, rakiete, stacje ladowania,
+inne budynki i aktualne polozenie robotow. Nie mozna wiec zbudowac np.
+panelu slonecznego bezposrednio na hucie, nawet jesli kursor wskazuje grunt
+pod budynkiem. **Kopalnia** nadal wymaga konkretnego zloza zelaza;
+jest to jedyny dozwolony wyjatek od zakazu zabudowy zloz.
+
+Siatka jest wyswietlana przez MultiMesh (`scripts/build_placement_preview.gd`)
+i nie posiada kolizji. Weryfikacja w `scripts/main.gd` korzysta
+z tej samej informacji o zajetosci terenu co wyswietlanie podgladu,
+wiec nie ma rozbieznosci miedzy kolorem a mozliwoscia postawienia budynku.
+Test regresyjny: `tests/build_placement_smoke.gd`.
+
+**Test reczny:** wybierz V, przesun kursor nad magazyn (czerwony obrys),
+a nastepnie na puste pole (zielony). Nacisnij Esc i powtorz test dla
+centrum B, huty H oraz akumulatora K. Sprawdz rowniez M nad zelazem.
+
 ## WOW 0.9 — rozbudowa sieci energetycznej i pracujace maszyny
 
 Ta aktualizacja dodaje budowane instalacje energetyczne i animacje
