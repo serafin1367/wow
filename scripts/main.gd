@@ -1432,7 +1432,8 @@ func _tick_logistics(delta: float) -> void:
 			worker.set_meta("save_id", "worker:%d" % i)
 		if worker.robot_role == "hauler" and worker.logistics_job_id == "" and worker.factory_route_active and worker.carried_amount == 0:
 			# Wylacz stara trase punkt-punkt po zakonczeniu aktualnej dostawy.
-			worker.command_move([])
+			var clear_route: Array[Vector3] = []
+			worker.command_move(clear_route)
 	var hub = logistics_depots[0]
 	if metal_conveyor == null:
 		logistics_manager.submit(factory_smelter, hub, "metal", 25, 95)
