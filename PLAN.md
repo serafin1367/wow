@@ -41,6 +41,9 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 ### WOW 0.13 — trwały zapis i odczyt gry (P0) — **ukończony technicznie (odbiór wizualny UI na Windows pozostaje)**
 
+**Audyt S1/S2 (28.10.2026):** aktualna implementacja była już ukończona; ponownie sprawdzono i udokumentowano kontrakt w [`docs/SAVE_FORMAT_V1.md`](docs/SAVE_FORMAT_V1.md). Dodano bezwzględną walidację typów JSON (wyeliminowano serializację `StringName`), ochronę poprawnego slotu przed zapisem nieprawidłowego snapshotu i limit 16 MiB oraz `tests/save_basics_smoke.gd` dla planety, zasobów, obrotu budynku i nieudanego zapisu. Test S1/S2 przeszedł na Linuxie i Windows: [GitHub Actions](https://github.com/serafin1367/wow/actions/runs/40712547263). Pozostałe podzadania 0.13 pozostają ukończone; kolejnym **nowym** etapem projektu jest 0.16.
+
+
 - [x] Wyodrębnić `SaveGameManager` z wersjonowanym formatem danych (`schema_version`).
 - [x] Ustalić **wspólny kontrakt serializacji dla wszystkich obiektów utrwalanych w stanie gry**: `to_dict() -> Dictionary` i `from_dict(data: Dictionary) -> void` lub równoważny adapter dla `Resource`. Wymagany od 0.13 także dla **każdego nowego obiektu z etapów 0.14+**, w tym magazynów, portów i zleceń logistycznych; stan nie może zależeć od bezpośredniej serializacji `Node`.
 - [x] Zdefiniować stabilne identyfikatory `save_id`, `type_id` i wersje danych obiektów; zapisywać **identyfikatory relacji**, nie ścieżki `NodePath`, instancje węzłów ani referencje w pamięci.
