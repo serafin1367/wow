@@ -5,6 +5,7 @@ extends CanvasLayer
 signal build_center_requested
 signal build_forester_requested
 signal train_robot_requested
+signal train_hauler_requested
 signal charge_requested
 signal planet_change_requested
 signal mine_requested
@@ -41,6 +42,7 @@ var event_label: Label
 var build_button: Button
 var forester_button: Button
 var train_button: Button
+var hauler_button: Button
 var charge_button: Button
 var planet_button: Button
 var mine_button: Button
@@ -190,6 +192,9 @@ func _make_bottom_bar() -> void:
 	train_button = _action_button("T   GORNIK", "10 drewna · 20 zlota", TURQUOISE)
 	train_button.pressed.connect(func(): train_robot_requested.emit())
 	actions.add_child(train_button)
+	hauler_button = _action_button("SHIFT+T   TRANSPORT", "Nowy transportowiec: 10 drewna + 20 zlota", ORANGE)
+	hauler_button.pressed.connect(func(): train_hauler_requested.emit())
+	actions.add_child(hauler_button)
 	forester_button = _action_button("L   REKULTYWACJA", "30 drewna · 10 kamienia", TURQUOISE)
 	forester_button.pressed.connect(func(): build_forester_requested.emit())
 	actions.add_child(forester_button)
@@ -291,6 +296,7 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("G   Siatka 1/2/4 m", 12, TEXT))
 	help.add_child(_label("D   Droga | F   Plan", 12, TURQUOISE))
 	help.add_child(_label("U   Magazyn posredni", 12, ORANGE))
+	help.add_child(_label("Shift+T   Transportowiec", 12, TURQUOISE))
 	help.add_child(_label("X   Budowa seryjna", 12, TEXT))
 	help.add_child(_label("Ctrl+S / Ctrl+O   Zapis / odczyt", 11, TURQUOISE))
 	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
