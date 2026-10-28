@@ -4,22 +4,50 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
-## WOW 0.14 — logistyka: wspolny bufor (rozpoczete)
+## WOW 0.14 — logistyka i magazyny posrednie (w trakcie testow)
 
-Powstal pierwszy komponent architektury nastepnej wersji:
-`scripts/inventory.gd` — **wspolny interfejs zasobow dla robotow i tasmiociagow**.
-Jest niezalezny od `Node`, umozliwia rezerwacje materialu przy zrodle
-i miejsca przy odbiorcy, bez podwojnego przydzielenia tego samego ladunku.
-Mozna wykonywac transfer z ograniczona pojemnoscia i serializowac
-bufory wraz z aktywnymi rezerwacjami (`to_dict` / `from_dict`).
+**Nowy budynek:** U otwiera tryb budowy magazynu posredniego (`DEPOT`).
+Cena: **15 drewna + 10 kamienia**, limit: 3 magazyny.
+Podglad 3D, zielona/czerwona siatka, obroty R i tryb planowania F
+dzialaja tak samo jak dla innych konstrukcji. Kazdy magazyn ma
+5 rozdzielonych zasobow (drewno, kamien, zloto, ruda zelaza, metal)
+o pojemnosci **120 jednostek na rodzaj**. Kliknij budynek, aby zobaczyc stan.
 
-**Wazne:** modul jest na razie przygotowany i przetestowany jednostkowo.
-Istniejaca kopalnia, huta, roboty i tasmy **nie zostaly jeszcze przepiete**
-na `Inventory`; to kolejne zadanie WOW 0.14. Aktualny system dostaw
-dziala nadal wedlug logiki WOW 0.13.
+**Wspolny bufor** `scripts/inventory.gd` jest podlaczony do wydobycia
+rudy i przetapiania metalu. Roboty i tasmy pobieraja i oddaja surowce
+przez wspolne funkcje `withdraw_resource()` / `deposit_resource()`,
+ktore uwzgledniaja zajetosc i rezerwacje. Istniejace klawisze J/N
+i sterowanie robotami sa nadal obslugiwane.
 
-Test: `tests/inventory_smoke.gd` (pojemnosc, rezerwacje, anulowanie,
-zapis/odczyt w trakcie transportu i bilans materialowy).
+**Zlecenia automatyczne:** jezeli istnieja kopalnia, huta i magazyn
+posredni, `scripts/logistics_manager.gd` przydziela wolnym
+transportowcom prace wedlug priorytetow:
+- magazyn posredni -> glowny sklad (metal; najwyzszy priorytet),
+- magazyn posredni -> huta (ruda),
+- huta -> magazyn posredni (metal),
+- kopalnia -> magazyn posredni (ruda).
+
+Kazde zlecenie rezerwuje towar u nadawcy i miejsce w buforze odbiorcy.
+Jednostka podczas dostawy ma wlasnosc ladunku, ktory nie moze byc
+rowoczesnie zabrany przez druga jednostke ani tasme. Priorytety nie
+zastepuja recznych komend dla pozostalych rodzajow robotow.
+Wspolna logistyka zaczyna dzialac po zbudowaniu pierwszego magazynu
+posredniego; bez niego nadal obowiazuje poprzednia trasa fabryczna.
+
+**Zapis/odczyt:** magazyny, ich rezerwacje i zlecenia transportowe
+sa czescia wersjonowanego zapisu WOW 0.13. Wczytywanie odtwarza
+najpierw budynki, potem relacje miedzy robotami i magazynami.
+
+Testy: `tests/inventory_smoke.gd`,
+`tests/logistics_depot_smoke.gd` i
+`tests/logistics_jobs_smoke.gd` (ten ostatni jest nowym testem
+regresyjnym zlecenia podczas jazdy i wymaga potwierdzenia na CI).
+
+**Ograniczenia:** aktualnie system automatycznych tras uzywa
+pierwszego wybudowanego magazynu, a nie optymalizuje jeszcze wyboru
+wielu magazynow ani rozdzialu zadan miedzy wieksza flote.
+Przy zmianie ukladu kolonii moze byc potrzebne ponowne wyznaczenie
+trasy. UI nie ma jeszcze edytora priorytetow.
 
 ## WOW 0.13 — zapis i odczyt kolonii
 
