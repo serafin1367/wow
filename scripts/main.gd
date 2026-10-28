@@ -677,6 +677,9 @@ func _spawn_planned_structure(entry: Dictionary) -> void:
 			structure = bank
 		"depot":
 			var depot = LOGISTICS_DEPOT.new()
+			var stable_id: String = "building:depot:%d" % logistics_depots.size()
+			depot.set_meta("save_id", stable_id)
+			depot.cargo.save_id = stable_id + ":buffer"
 			logistics_depots.append(depot)
 			structure = depot
 	if structure == null:
