@@ -499,6 +499,187 @@ func _undo_blueprint() -> void:
 		_set_status("Cofnieto ostatni element projektu.")
 
 
+func _start_road_mode() -> void:
+	if road_mode:
+		_cancel_road_mode()
+		_set_status("Anulowano planowanie drogi.")
+		return
+	_cancel_build_modes()
+	road_mode = true
+	road_anchors.clear()
+	_set_status("DROGA: LPM wskaz poczatek, potem kieruj mysz lub dodaj zakrety LPM. Enter zatwierdza.")
+
+
+func _cancel_road_mode() -> void:
+	road_mode = false
+	road_anchors.clear()
+	road_preview_route.clear()
+	if roads != null:
+		roads.cancel_preview()
+
+
+func _road_click(screen_position: Vector2) -> void:
+	var hit: Dictionary = _raycast(screen_position, 1)
+	if hit.is_empty():
+		_set_status("Droge trzeba wytyczyc na gruncie.")
+		return
+	var p: Vector3 = hit["position"]
+	var site := Vector3(roundf(p.x), 0.0, roundf(p.z))
+	var cell := Vector2i(roundi(site.x), roundi(site.z))
+	if not _road_cell_available(cell):
+		_set_status("Droga nie moze zaczynac ani konczyc sie na przeszkodzie.")
+		return
+	if road_anchors.size() >= 12:
+		_set_status("Drogę mozna poprowadzic przez najwyzej 12 punktow.")
+		return
+	road_anchors.append(site)
+	road_hover_elapsed = 1.0
+	_update_road_preview(0.0)
+	_set_status("Droga: %d punktow | Enter zbuduj, LPM dodaj zakret, Backspace cofnij." % road_anchors.size())
+
+
+func _road_cell_available(cell: Vector2i) -> bool:
+	if abs(cell.x) > 43 or abs(cell.y) > 43:
+		return false
+	if navigation.grid.is_point_solid(cell):
+		return false
+	if blueprints != null:
+		for entry in blueprints.entries:
+			var site: Vector3 = entry["site"]
+			if Vector2(float(cell.x), float(cell.y)).distance_squared_to(Vector2(site.x, site.z)) <= pow(_build_radius(entry["kind"]) + 0.4, 2.0):
+				return false
+	return true
+
+
+func _valid_road_route(path: Array[Vector2i]) -> bool:
+	if path.size() < 2 or path.size() > roads.MAX_PATH_CELLS:
+		return false
+	for cell in path:
+		if not _road_cell_available(cell):
+			return false
+	return true
+
+
+func _update_road_preview(delta: float) -> void:
+	if not road_mode or roads == null:
+		return
+	road_hover_elapsed += delta
+	if road_hover_elapsed < 0.18:
+		return
+	road_hover_elapsed = 0.0
+	if road_anchors.is_empty():
+		roads.cancel_preview()
+		road_preview_route.clear()
+		return
+	var hit: Dictionary = _raycast(get_viewport().get_mouse_position(), 1)
+	if hit.is_empty():
+		return
+	var point: Vector3 = hit["position"]
+	var end := Vector3(roundf(point.x), 0.0, roundf(point.z))
+	var anchors: Array[Vector3] = road_anchors.duplicate()
+	if end != anchors[anchors.size() - 1]:
+		anchors.append(end)
+	var candidate: Array[Vector2i] = roads.route(anchors, navigation)
+	if not _valid_road_route(candidate):
+		roads.cancel_preview()
+		road_preview_route.clear()
+		return
+	road_preview_route = candidate
+	roads.preview(candidate)
+
+
+func _confirm_road() -> void:
+	if not road_mode:
+		return
+	if not _valid_road_route(road_preview_route):
+		_set_status("Brak poprawnej trasy drogi. Przesun kursor na wolny teren.")
+		return
+	var stone_cost: int = roads.cost(road_preview_route)
+	if stone_cost == 0:
+		_cancel_road_mode()
+		_set_status("Wybrana trasa jest juz wybrukowana.")
+		return
+	if not _spend_resources({"stone": stone_cost}):
+		_set_status("Droga wymaga %d kamienia (1 kamien za 4 nowe pola)." % stone_cost)
+		return
+	var paved_count: int = roads.commit(road_preview_route)
+	_cancel_road_mode()
+	_set_status("Zbudowano %d pol drogi za %d kamienia. Roboty moga z nich korzystac." % [paved_count, stone_cost])
+
+
+func _spawn_planned_structure(entry: Dictionary) -> void:
+	var kind: String = entry["kind"]
+	var site: Vector3 = entry["site"]
+	var quarter_turns: int = int(entry["quarters"])
+	var structure: Node3D
+	match kind:
+		"mine":
+			var source = _mine_resource()
+			factory_mine = MINE_SCRIPT.new()
+			factory_mine.ore_source = source
+			structure = factory_mine
+		"smelter":
+			factory_smelter = SMELTER_SCRIPT.new()
+			structure = factory_smelter
+		"center":
+			town_hall = TOWN_HALL_SCRIPT.new()
+			structure = town_hall
+		"forester":
+			var hut = FORESTER_SCRIPT.new()
+			hut.plant_requested.connect(_on_forester_plant_request)
+			foresters.append(hut)
+			structure = hut
+		"solar":
+			var panel = SOLAR_SCRIPT.new()
+			solar_arrays.append(panel)
+			structure = panel
+		"battery":
+			var bank = BATTERY_SCRIPT.new()
+			battery_banks.append(bank)
+			structure = bank
+	if structure == null:
+		return
+	structure.position = site
+	structure.rotation.y = float(posmod(quarter_turns, 4)) * PI * 0.5
+	add_child(structure)
+	if kind == "mine":
+		var source = factory_mine.ore_source
+		source.collision_layer = 0
+		source.visible = false
+		source.remove_from_group("resource_nodes")
+	if kind in ["mine", "smelter", "solar", "battery"]:
+		_connect_power_node(structure)
+	navigation.block_circle(Vector2(site.x, site.z), _build_radius(kind))
+
+
+func _confirm_blueprints() -> void:
+	if blueprints == null or blueprints.entries.is_empty():
+		_set_status("Brak zaplanowanych budynkow. F i LPM: dodaj projekt.")
+		return
+	# Rewalidacja kazdego elementu z pominieciem tylko jego wlasnej rezerwacji.
+	for index in range(blueprints.entries.size()):
+		var entry: Dictionary = blueprints.entries[index]
+		if not _can_place_structure_at(entry["site"], entry["kind"], index):
+			_set_status("Nie mozna zrealizowac projektu: kolizja przy elemencie %d." % (index + 1))
+			return
+	var costs: Dictionary = blueprints.total_cost(Callable(self, "_build_cost"))
+	if not _can_afford(costs):
+		_set_status("Nie wystarcza surowcow na caly projekt: %s." % blueprints.describe_cost(Callable(self, "_build_cost")))
+		return
+	if not _spend_resources(costs):
+		return
+	var count: int = blueprints.entries.size()
+	for entry in blueprints.entries:
+		_spawn_planned_structure(entry)
+	blueprints.clear_plan()
+	_cancel_build_modes()
+	_update_factory_power()
+	_start_logistics_if_ready()
+	_update_action_buttons()
+	_update_planning_hud()
+	_set_status("Projekt wykonany: %d budynkow. Koszty pobrano jednorazowo." % count)
+
+
 func _create_build_preview() -> void:
 	build_preview = BUILD_PREVIEW_SCRIPT.new()
 	add_child(build_preview)
