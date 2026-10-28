@@ -107,6 +107,15 @@ jobs:
             echo "Infrastructure planning or road integration test failed."
             exit 1
           fi
+      - name: Test S1 S2 schema-v1 JSON and safe save overwrite
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/save_basics_smoke.gd 2>&1 | tee /tmp/wow-save-basics.log
+          grep -F 'SAVE BASICS SMOKE OK' /tmp/wow-save-basics.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|SAVE BASICS TEST:' /tmp/wow-save-basics.log; then
+            exit 1
+          fi
       - name: Test versioned save load and in-flight cargo conservation
         shell: bash
         run: |
@@ -251,6 +260,20 @@ jobs:
       - name: Import project on Windows
         shell: pwsh
         run: godot --headless --path . --editor --quit
+      - name: S1 S2 schema and basic save/load roundtrip on Windows
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/save_basics_smoke.gd > wow-windows-save-basics.log 2>&1
+          code=$?
+          cat wow-windows-save-basics.log
+          if [ "$code" -ne 0 ]; then
+            exit "$code"
+          fi
+          grep -F 'SAVE BASICS SMOKE OK' wow-windows-save-basics.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|SAVE BASICS TEST:' wow-windows-save-basics.log; then
+            exit 1
+          fi
       - name: Save/load filesystem and cargo roundtrip on Windows
         shell: bash
         run: |
