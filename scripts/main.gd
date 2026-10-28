@@ -24,6 +24,7 @@ const BUILD_PREVIEW_SCRIPT = preload("res://scripts/build_placement_preview.gd")
 const ROADS_SCRIPT = preload("res://scripts/technical_roads.gd")
 const BLUEPRINTS_SCRIPT = preload("res://scripts/construction_blueprints.gd")
 const LOGISTICS_DEPOT = preload("res://scripts/logistics_depot.gd")
+const LOGISTICS_MANAGER = preload("res://scripts/logistics_manager.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_game_manager.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
@@ -64,6 +65,8 @@ var resource_totals: Dictionary = {"wood": 90, "gold": 0, "stone": 60, "metal": 
 var forester_build_mode: bool = false
 var depot_build_mode: bool = false
 var logistics_depots: Array = []
+var logistics_manager = LOGISTICS_MANAGER.new()
+var logistics_elapsed: float = 0.0
 var foresters: Array = []
 var build_mode: bool = false
 var town_hall: StaticBody3D
@@ -405,6 +408,7 @@ func _create_depot() -> void:
 
 	var warehouse = DEPOT_VISUAL_SCRIPT.new()
 	depot.add_child(warehouse)
+	depot.set_meta("save_id", "stockpile")
 
 func _create_landing_site() -> void:
 	# Rakieta jest juz po ladowaniu. Zostanie pozniej zastapiona animacja lotu.
@@ -1405,6 +1409,40 @@ func _create_camera() -> void:
 	add_child(camera_rig)
 
 
+func _tick_logistics(delta: float) -> void:
+	if logistics_depots.is_empty() or factory_mine == null or factory_smelter == null:
+		return
+	logistics_elapsed += delta
+	if logistics_elapsed < 0.8:
+		return
+	logistics_elapsed = 0.0
+	# Identyfikatory sa stale w zapisie, nie korzystamy ze sciezek NodePath.
+	if not factory_mine.has_meta("save_id"):
+		factory_mine.set_meta("save_id", "factory:mine")
+	if not factory_smelter.has_meta("save_id"):
+		factory_smelter.set_meta("save_id", "factory:smelter")
+	for i in range(logistics_depots.size()):
+		if not logistics_depots[i].has_meta("save_id"):
+			logistics_depots[i].set_meta("save_id", "building:depot:%d" % i)
+	var stockpile = get_node("Stockpile")
+	stockpile.set_meta("save_id", "stockpile")
+	for i in range(workers.size()):
+		var worker = workers[i]
+		if not worker.has_meta("save_id"):
+			worker.set_meta("save_id", "worker:%d" % i)
+		if worker.robot_role == "hauler" and worker.logistics_job_id == "" and worker.factory_route_active and worker.carried_amount == 0:
+			# Wylacz stara trase punkt-punkt po zakonczeniu aktualnej dostawy.
+			worker.command_move([])
+	var hub = logistics_depots[0]
+	if metal_conveyor == null:
+		logistics_manager.submit(factory_smelter, hub, "metal", 25, 95)
+	logistics_manager.submit(hub, stockpile, "metal", 25, 110, true)
+	if ore_conveyor == null:
+		logistics_manager.submit(hub, factory_smelter, "iron_ore", 25, 100)
+		logistics_manager.submit(factory_mine, hub, "iron_ore", 25, 85)
+	logistics_manager.dispatch(workers, navigation)
+
+
 func _create_hud() -> void:
 	hud = HUD_SCRIPT.new()
 	hud.name = "ColonyHUD"
@@ -1441,6 +1479,7 @@ func _create_hud() -> void:
 
 
 func _process(delta: float) -> void:
+	_tick_logistics(delta)
 	_update_build_preview(delta)
 	_update_road_preview(delta)
 	hud_elapsed += delta
