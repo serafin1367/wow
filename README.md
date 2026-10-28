@@ -43,11 +43,25 @@ Testy: `tests/inventory_smoke.gd`,
 `tests/logistics_jobs_smoke.gd` (ten ostatni jest nowym testem
 regresyjnym zlecenia podczas jazdy i wymaga potwierdzenia na CI).
 
-**Ograniczenia:** aktualnie system automatycznych tras uzywa
-pierwszego wybudowanego magazynu, a nie optymalizuje jeszcze wyboru
-wielu magazynow ani rozdzialu zadan miedzy wieksza flote.
-Przy zmianie ukladu kolonii moze byc potrzebne ponowne wyznaczenie
-trasy. UI nie ma jeszcze edytora priorytetow.
+**Flota i wiele magazynow:** Shift+T (lub przycisk TRANSPORT na
+dolnym pasku) szkoli kolejnego transportowca za 10 drewna i 20 zlota
+w centrum dowodzenia. Zlecenia mozna realizowac rownolegle przez
+kilka robotow. Przy wielu magazynach menedzer analizuje bufory
+**wszystkich** depotow, bez podwojnego rezerwowania wyjscia kopalni.
+
+**Limity i priorytety (API):**
+`LogisticsDepot.set_stock_limits(resource_type, minimum, maximum)`
+oraz `LogisticsManager.set_priority(job_id, priority)` pozwalaja
+sterowac transportem. Ustawienia limitow i aktywne rezerwacje
+sa zapisywane i odtwarzane. `LogisticsManager.cancel(job_id, workers)`
+bezpiecznie anuluje zadania *przed* odbiorem towaru; zlecenia
+z ladunkiem w trasie trzeba dokonczyc.
+
+**Ograniczenia:** nie ma jeszcze widocznego edytora limitow
+min./maks. i priorytetow w HUD, automatyka nie optymalizuje tras
+miedzy wieloma magazynami wedlug odleglosci, a zmiana celu po
+odebraniu ladunku wymaga obslugi w kolejnym etapie.
+Brak drogi pozostawia zlecenie w kolejce.
 
 ## WOW 0.13 — zapis i odczyt kolonii
 
