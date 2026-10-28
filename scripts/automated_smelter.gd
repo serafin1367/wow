@@ -33,6 +33,7 @@ func _init() -> void:
 	output_buffer.configure("metal", MAX_METAL)
 
 var accumulated: float = 0.0
+var total_smelted: int = 0
 var machine_visual = null
 
 
@@ -75,6 +76,7 @@ func _process(delta: float) -> void:
 			return
 		var produced: int = output_buffer.push("metal", 1)
 		assert(produced == 1, "Smelter output must have space before consuming ore")
+		total_smelted += produced
 		stock_changed.emit()
 
 
@@ -127,7 +129,8 @@ func to_dict() -> Dictionary:
 	return {"save_id": str(get_meta("save_id", "")), "position":
 		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
 		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated,
-		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict()}
+		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict(),
+		"total_smelted": total_smelted}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -141,3 +144,4 @@ func from_dict(data: Dictionary) -> void:
 	else:
 		metal_stock = clampi(int(data.get("metal_stock", 0)), 0, MAX_METAL)
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
+	total_smelted = maxi(0, int(data.get("total_smelted", 0)))
