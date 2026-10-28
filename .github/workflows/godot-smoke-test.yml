@@ -217,6 +217,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|PRODUCTION LAYOUT TEST:' /tmp/wow-production-layout.log; then
             exit 1
           fi
+      - name: Test prioritized multi-batch factory production queues
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 60s godot --headless --path . --script res://tests/production_queue_smoke.gd 2>&1 | tee /tmp/wow-production-queue.log
+          grep -F 'PRODUCTION QUEUE SMOKE OK' /tmp/wow-production-queue.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|PRODUCTION QUEUE TEST:' /tmp/wow-production-queue.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
