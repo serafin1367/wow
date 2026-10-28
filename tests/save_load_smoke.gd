@@ -136,7 +136,9 @@ func _run_test() -> void:
 		_fail("Paczka nie wznowila dostawy po zwolnieniu bufora")
 		return
 	if _ore_balance(fresh) != mass_before:
-		_fail("Zduplikowano lub zgubiono rude podczas wznowienia")
+		_fail("Bilans przed=%d po=%d mine=%d smelter=%d parcels=%s" % [
+			mass_before, _ore_balance(fresh), fresh.factory_mine.stock,
+			fresh.factory_smelter.ore_stock, str(fresh.ore_conveyor.to_dict()["packets"])])
 		return
 
 	var damaged: Dictionary = disk.duplicate(true)
