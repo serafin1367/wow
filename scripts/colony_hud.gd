@@ -22,7 +22,13 @@ signal commit_plan_requested
 signal clear_plan_requested
 signal save_requested
 signal load_requested
+signal logistics_open_requested
+signal logistics_refresh_requested
+signal logistics_stock_limits_requested(depot_id: String, resource_type: String, minimum: int, maximum: int)
+signal logistics_priority_requested(job_id: String, priority: int)
+signal logistics_cancel_requested(job_id: String)
 
+const LOGISTICS_PANEL = preload("res://scripts/logistics_panel.gd")
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
 const BORDER = Color(0.23, 0.34, 0.39, 1.0)
@@ -58,6 +64,7 @@ var depot_button: Button
 var planning_button: Button
 var sticky_button: Button
 var plan_info_label: Label
+var logistics_panel = null
 
 
 func _ready() -> void:
@@ -70,6 +77,16 @@ func _ready() -> void:
 
 	_make_top_bar()
 	_make_bottom_bar()
+	logistics_panel = LOGISTICS_PANEL.new()
+	root.add_child(logistics_panel)
+	logistics_panel.close_requested.connect(func(): logistics_panel.visible = false)
+	logistics_panel.refresh_requested.connect(func(): logistics_refresh_requested.emit())
+	logistics_panel.stock_limits_requested.connect(func(a: String, b: String, c: int, d: int):
+		logistics_stock_limits_requested.emit(a, b, c, d))
+	logistics_panel.priority_requested.connect(func(a: String, b: int):
+		logistics_priority_requested.emit(a, b))
+	logistics_panel.cancel_requested.connect(func(a: String):
+		logistics_cancel_requested.emit(a))
 	set_resources(0, 0, 0, 0, 3, 30)
 	set_power(0.0, false)
 	set_no_selection()
@@ -266,6 +283,11 @@ func _make_bottom_bar() -> void:
 	clear_plan.tooltip_text = "Usun niezrealizowane hologramy"
 	clear_plan.pressed.connect(func(): clear_plan_requested.emit())
 	plan_row.add_child(clear_plan)
+	var logistics_action := Button.new()
+	logistics_action.text = "O  LOGISTYKA"
+	logistics_action.tooltip_text = "Pokaz magazyny, ustaw progi i priorytety, anuluj zlecenia"
+	logistics_action.pressed.connect(func(): logistics_open_requested.emit())
+	plan_row.add_child(logistics_action)
 	var save_action := Button.new()
 	save_action.text = "ZAPISZ"
 	save_action.tooltip_text = "Ctrl+S: zapisz caly stan kolonii"
@@ -296,12 +318,25 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("G   Siatka 1/2/4 m", 12, TEXT))
 	help.add_child(_label("D   Droga | F   Plan", 12, TURQUOISE))
 	help.add_child(_label("U   Magazyn posredni", 12, ORANGE))
+	help.add_child(_label("O   Panel logistyki", 12, TURQUOISE))
 	help.add_child(_label("Shift+T   Transportowiec", 12, TURQUOISE))
 	help.add_child(_label("X   Budowa seryjna", 12, TEXT))
 	help.add_child(_label("Ctrl+S / Ctrl+O   Zapis / odczyt", 11, TURQUOISE))
 	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
 	help.add_child(_label("ENTER   Zbuduj trase", 12, TEXT))
 	help.add_child(_label("ESC   Anuluj budowe", 12, TEXT))
+
+
+func toggle_logistics_panel() -> bool:
+	if logistics_panel == null:
+		return false
+	logistics_panel.visible = not logistics_panel.visible
+	return logistics_panel.visible
+
+
+func refresh_logistics_panel(depots: Array[Dictionary], jobs: Array[Dictionary]) -> void:
+	if logistics_panel != null and logistics_panel.visible:
+		logistics_panel.show_state(depots, jobs)
 
 
 func set_planet(planet: String) -> void:
