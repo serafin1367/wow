@@ -64,6 +64,9 @@ func _run() -> void:
 	if depot.cargo.available_input("iron_ore") != depot.CAPACITY_PER_RESOURCE - 20:
 		_fail("Zniknela rezerwacja miejsca w magazynie")
 		return
+	if game.logistics_manager.cancel(str(job["id"]), game.workers):
+		_fail("Wolno anulowac zlecenie z ladunkiem juz na robocie")
+		return
 	if game.logistics_manager.get_job(job["id"])["status"] != "picked":
 		_fail("Zlecenie nie przeszlo w etap transportu")
 		return
@@ -96,6 +99,7 @@ func _run() -> void:
 		_fail("Nie zachowano bilansu rudy po odczycie transportu")
 		return
 	var final_depot = fresh.logistics_depots[0]
+	final_depot.set_stock_limits("iron_ore", 5, 120)
 	if final_depot.cargo.available_input("iron_ore") != final_depot.CAPACITY_PER_RESOURCE - 20:
 		_fail("Zapis usunal rezerwacje miejsca przy odbiorcy")
 		return
@@ -121,6 +125,18 @@ func _run() -> void:
 			second = candidate
 	if second.is_empty():
 		_fail("Magazyn nie generuje dostaw do huty")
+		return
+	if int(second["amount"]) != 15:
+		_fail("Ochrona zapasu minimalnego magazynu nie dziala")
+		return
+	if not fresh.logistics_manager.set_priority(str(second["id"]), 175):
+		_fail("Nie mozna nadac nowego priorytetu zleceniu")
+		return
+	if not fresh.logistics_manager.cancel(str(second["id"]), fresh.workers):
+		_fail("Nie mozna anulowac jeszcze nieodebranego ladunku")
+		return
+	if final_depot.available_export("iron_ore") != 15:
+		_fail("Anulowanie zlecenia nie zwolnilo rezerwacji")
 		return
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
 	print("LOGISTICS JOB SMOKE OK: reserved robot pickup, saved journey, delivery and depot to smelter")
