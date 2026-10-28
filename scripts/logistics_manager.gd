@@ -158,6 +158,62 @@ func cancel(job_id: String, workers: Array) -> bool:
 	return true
 
 
+func reroute_picked(job_id: String, new_destination: Node3D, workers: Array) -> bool:
+	# Zmiana celu dopiero po odebraniu paczki. Najpierw rezerwujemy
+	# nowy port, a dopiero po znalezieniu trasy zwalniamy stary.
+	var job: Dictionary = get_job(job_id)
+	if job.is_empty() or job["status"] != "picked" or not is_instance_valid(new_destination):
+		return false
+	var new_id: String = _node_id(new_destination)
+	if new_id.is_empty() or new_id == str(job["destination_id"]):
+		return false
+	var worker = null
+	for item in workers:
+		if item.logistics_job_id == job_id and item.carried_amount == int(job["amount"]):
+			worker = item
+			break
+	if not is_instance_valid(worker):
+		return false
+	if worker.state != worker.WorkState.TO_LOGISTICS_DELIVERY and worker.state != worker.WorkState.IDLE:
+		return false
+	var material: String = str(job["resource_type"])
+	var new_sink: bool = new_id == "stockpile" and material == "metal"
+	var new_port = _destination_port(new_destination, material)
+	if not new_sink and new_port == null:
+		return false
+	if not new_sink and new_destination.has_method("available_import"):
+		if new_destination.available_import(material) < int(job["amount"]):
+			return false
+	if not new_sink and not new_port.reserve_input(job_id + ":in", material, int(job["amount"])):
+		return false
+
+	var old_destination = destinations.get(job_id)
+	var old_sink: bool = bool(job["sink"])
+	var old_state = worker.state
+	var old_waypoints: Array[Vector3] = worker.waypoints.duplicate()
+	var old_next: int = worker.next_waypoint
+	worker.logistics_destination = new_destination
+	worker.logistics_sink = new_sink
+	if not worker._route_logistics(false):
+		if not new_sink:
+			new_port.cancel_input(job_id + ":in")
+		worker.logistics_destination = old_destination
+		worker.logistics_sink = old_sink
+		worker.state = old_state
+		worker.waypoints = old_waypoints
+		worker.next_waypoint = old_next
+		return false
+
+	if not old_sink and is_instance_valid(old_destination):
+		var old_port = _destination_port(old_destination, material)
+		if old_port != null:
+			old_port.cancel_input(job_id + ":in")
+	job["destination_id"] = new_id
+	job["sink"] = new_sink
+	destinations[job_id] = new_destination
+	return true
+
+
 func finish(job_id: String) -> void:
 	var job: Dictionary = get_job(job_id)
 	if job.is_empty():
