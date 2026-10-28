@@ -561,11 +561,14 @@ i sprawdzenia w edytorze Godot na komputerze gracza.
 
 ## Kolejnosc dalszych prac
 
-1. Przeksztalcic obecny pobor surowcow na **wydobycie wiertnica → bufor przykopalniany**.
-2. Oddzielic logistyke od wydobywania: robot transportowy zabiera zapas z buforow.
-3. Dodac taśmociagi z automatycznym przesylaniem elementow i hute przetwarzajaca rudy.
-4. Zbudowac siec zasilania (generacja, akumulacja, pobor, ograniczenia mocy).
-5. Rozbudowac obecny HUD o karte maszyny, kolejki produkcji i stan sieci energetycznej.
+**[PLAN.md — aktualny plan rozwoju WOW 0.13 → 1.0](PLAN.md)** zawiera priorytety,
+liste zadan, kryteria akceptacji, zaleznosci i testy dla kazdego etapu.
+
+**Najblizszy etap: WOW 0.13 — zapis i odczyt rozgrywki.**
+Pozniej: magazyny posrednie i priorytety logistyki, panel produkcji,
+nowe receptury, energetyka 2.0, rozbudowane tasmociagi i AI robotow.
+
+Opisane powyzej wersje 0.2–0.12 to historia zaimplementowanych etapow.
 
 ## Ograniczenia wersji
 
