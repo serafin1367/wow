@@ -6,7 +6,7 @@ signal resource_delivered(resource_type: String, quantity: int)
 
 const MODEL_SCRIPT = preload("res://scripts/robot_model.gd")
 
-enum WorkState { IDLE, MOVING, TO_RESOURCE, GATHERING, TO_DEPOT, TO_CHARGER, CHARGING, TO_REPAIR, REPAIRING, TO_FACTORY_PICKUP, WAIT_FACTORY_PICKUP, TO_FACTORY_INPUT, WAIT_FACTORY_OUTPUT, TO_FACTORY_DEPOT }
+enum WorkState { IDLE, MOVING, TO_RESOURCE, GATHERING, TO_DEPOT, TO_CHARGER, CHARGING, TO_REPAIR, REPAIRING, TO_FACTORY_PICKUP, WAIT_FACTORY_PICKUP, TO_FACTORY_INPUT, WAIT_FACTORY_OUTPUT, TO_FACTORY_DEPOT, TO_LOGISTICS_PICKUP, TO_LOGISTICS_DELIVERY }
 
 const BATTERY_MAX: float = 100.0
 const LOW_BATTERY: float = 22.0
@@ -45,6 +45,13 @@ var factory_stage: String = "pickup"
 var factory_wait_elapsed: float = 0.0
 var ore_belt_enabled: bool = false
 var metal_belt_enabled: bool = false
+var logistics_job_id: String = ""
+var logistics_source = null
+var logistics_destination = null
+var logistics_manager = null
+var logistics_type: String = ""
+var logistics_amount: int = 0
+var logistics_sink: bool = false
 
 
 func _ready() -> void:
@@ -121,6 +128,12 @@ func _physics_process(delta: float) -> void:
 
 	if state == WorkState.IDLE:
 		velocity = Vector3.ZERO
+		if logistics_job_id != "":
+			factory_wait_elapsed += delta
+			if factory_wait_elapsed > 1.0:
+				factory_wait_elapsed = 0.0
+				_route_logistics(carried_amount == 0)
+			return
 		if preferred_resource_type != "" and navigation_grid != null and energy > LOW_BATTERY:
 			idle_search_elapsed += delta
 			if idle_search_elapsed >= 2.0:
@@ -157,6 +170,8 @@ func _physics_process(delta: float) -> void:
 
 
 func command_move(new_path: Array[Vector3]) -> void:
+	if logistics_job_id != "":
+		return  # Rezervowany ladunek musi zostac dostarczony lub odzyskany.
 	factory_route_active = false
 	resource_target = null
 	repair_target = null
@@ -207,6 +222,8 @@ func command_charge() -> void:
 
 
 func command_factory_route(mine: Node3D, smelter: Node3D, grid: RefCounted, drop_point: Vector3) -> void:
+	if logistics_job_id != "":
+		return
 	if robot_role != "hauler" or not is_instance_valid(mine) or not is_instance_valid(smelter):
 		return
 	factory_mine = mine
@@ -229,6 +246,73 @@ func set_factory_belts(ore_active: bool, metal_active: bool) -> void:
 	metal_belt_enabled = metal_active
 	if factory_route_active and carried_amount == 0:
 		_travel_factory_stage("pickup")
+
+
+func command_logistics_job(job: Dictionary, source: Node3D, destination: Node3D, manager: RefCounted, grid: RefCounted) -> bool:
+	if robot_role != "hauler" or carried_amount != 0 or logistics_job_id != "" or state != WorkState.IDLE:
+		return false
+	logistics_job_id = str(job["id"])
+	logistics_source = source
+	logistics_destination = destination
+	logistics_manager = manager
+	logistics_type = str(job["resource_type"])
+	logistics_amount = int(job["amount"])
+	logistics_sink = bool(job["sink"])
+	navigation_grid = grid
+	factory_route_active = false
+	preferred_resource_type = ""
+	resource_target = null
+	return _route_logistics(true)
+
+
+func _route_logistics(pickup: bool) -> bool:
+	var target = logistics_source if pickup else logistics_destination
+	if not is_instance_valid(target) or navigation_grid == null:
+		state = WorkState.IDLE
+		return false
+	var radius: float = target.get_access_radius() + 0.55 if target.has_method("get_access_radius") else 3.5
+	var route: Array[Vector3] = navigation_grid.find_access_path(global_position, target.global_position, radius)
+	if route.is_empty():
+		state = WorkState.IDLE
+		return false
+	waypoints = route
+	next_waypoint = 0
+	state = WorkState.TO_LOGISTICS_PICKUP if pickup else WorkState.TO_LOGISTICS_DELIVERY
+	return true
+
+
+func _finish_logistics_leg() -> void:
+	if logistics_manager == null or logistics_job_id.is_empty():
+		state = WorkState.IDLE
+		return
+	if state == WorkState.TO_LOGISTICS_PICKUP:
+		var port = logistics_source.get_output_port(logistics_type)
+		var taken: int = port.commit_output(logistics_job_id + ":out") if port != null else 0
+		if taken != logistics_amount:
+			logistics_manager.finish(logistics_job_id)
+			logistics_job_id = ""
+			state = WorkState.IDLE
+			return
+		carried_type = logistics_type
+		carried_amount = taken
+		logistics_manager.note_pickup(logistics_job_id, taken)
+		_route_logistics(false)
+		return
+	if state == WorkState.TO_LOGISTICS_DELIVERY:
+		if logistics_sink:
+			resource_delivered.emit(carried_type, carried_amount)
+			carried_amount = 0
+		else:
+			var port = logistics_destination.get_input_port(logistics_type)
+			var delivered: int = port.commit_input(logistics_job_id + ":in") if port != null else 0
+			if delivered != carried_amount:
+				state = WorkState.IDLE  # Zachowaj ladunek i sprobuj ponownie.
+				return
+			carried_amount = 0
+		carried_type = ""
+		logistics_manager.finish(logistics_job_id)
+		logistics_job_id = ""
+		state = WorkState.IDLE
 
 
 func _travel_factory_stage(next_stage: String) -> void:
@@ -353,6 +437,9 @@ func _navigate_to_charger() -> bool:
 func _resume_after_charging() -> void:
 	var next: WorkState = suspended_state
 	suspended_state = WorkState.IDLE
+	if logistics_job_id != "":
+		_route_logistics(carried_amount == 0)
+		return
 	if factory_route_active:
 		_travel_factory_stage(factory_stage)
 		return
@@ -443,6 +530,9 @@ func _start_route(target: Vector3, next_state: WorkState) -> void:
 
 
 func _finish_route() -> void:
+	if state == WorkState.TO_LOGISTICS_PICKUP or state == WorkState.TO_LOGISTICS_DELIVERY:
+		_finish_logistics_leg()
+		return
 	if state == WorkState.TO_FACTORY_PICKUP:
 		factory_wait_elapsed = 0.0
 		state = WorkState.WAIT_FACTORY_PICKUP
@@ -583,7 +673,8 @@ func to_dict() -> Dictionary:
 		"suspended_state": int(suspended_state),
 		"suspended_destination": [suspended_destination.x, suspended_destination.y, suspended_destination.z],
 		"depot_position": [depot_position.x, depot_position.y, depot_position.z],
-		"harvest_elapsed": harvest_elapsed, "factory_wait_elapsed": factory_wait_elapsed}
+		"harvest_elapsed": harvest_elapsed, "factory_wait_elapsed": factory_wait_elapsed,
+		"logistics_job_id": logistics_job_id}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -591,7 +682,8 @@ func from_dict(data: Dictionary) -> void:
 	energy = clampf(float(data.get("energy", BATTERY_MAX)), 0.0, BATTERY_MAX)
 	carried_type = str(data.get("cargo_type", ""))
 	carried_amount = maxi(0, int(data.get("cargo_amount", 0)))
-	state = clampi(int(data.get("state", int(WorkState.IDLE))), 0, int(WorkState.TO_FACTORY_DEPOT)) as WorkState
+	logistics_job_id = str(data.get("logistics_job_id", ""))
+	state = clampi(int(data.get("state", int(WorkState.IDLE))), 0, int(WorkState.TO_LOGISTICS_DELIVERY)) as WorkState
 	suspended_state = clampi(int(data.get("suspended_state", 0)), 0, int(WorkState.TO_FACTORY_DEPOT)) as WorkState
 	preferred_resource_type = str(data.get("preferred_resource_type", ""))
 	factory_route_active = bool(data.get("factory_route", false))
@@ -619,6 +711,10 @@ func restore_links(data: Dictionary, lookup: Dictionary, nav: RefCounted, charge
 	repair_target = lookup.get(str(data.get("repair_id", "")))
 	factory_mine = lookup.get("factory:mine")
 	factory_smelter = lookup.get("factory:smelter")
+	if logistics_job_id != "":
+		# Menedzer zostanie dolaczony po odtworzeniu wszystkich obiektow.
+		logistics_source = null
+		logistics_destination = null
 	if factory_route_active and (factory_mine == null or factory_smelter == null):
 		factory_route_active = false
 		state = WorkState.IDLE
