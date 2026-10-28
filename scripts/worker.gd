@@ -262,7 +262,13 @@ func command_logistics_job(job: Dictionary, source: Node3D, destination: Node3D,
 	factory_route_active = false
 	preferred_resource_type = ""
 	resource_target = null
-	return _route_logistics(true)
+	if not _route_logistics(true):
+		logistics_job_id = ""
+		logistics_source = null
+		logistics_destination = null
+		logistics_manager = null
+		return false
+	return true
 
 
 func _route_logistics(pickup: bool) -> bool:
