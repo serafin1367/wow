@@ -1603,9 +1603,9 @@ func _update_colony_hud() -> void:
 		elif selected_structure in foresters:
 			hud.set_structure("MODUL REKULTYWACJI", "Odnawianie drzew: cykl 8 sekund.")
 		elif selected_structure == factory_mine:
-			hud.set_structure("KOPALNIA ZELAZA", "%s | %s | Cykl %.0f%%" % [factory_mine.describe(), production["mine_status"], production["mine_progress"]])
+			hud.set_structure("KOPALNIA ZELAZA", "WEJ: zloze | WYJ: 4 rudy / 1.5s\nBufor %d/%d | %s\nCykl %.0f%% | Moc %.1f kW" % [factory_mine.stock, factory_mine.MAX_BUFFER, production["mine_status"], production["mine_progress"], factory_mine.POWER_KW])
 		elif selected_structure == factory_smelter:
-			hud.set_structure("HUTA METALU", "%s | %s | Cykl %.0f%%" % [factory_smelter.describe(), production["smelter_status"], production["smelter_progress"]])
+			hud.set_structure("HUTA METALU", "WEJ: 2 rudy | WYJ: 1 metal / 3s\nRuda %d/%d, metal %d/%d\n%s | Cykl %.0f%% | %.1f kW" % [factory_smelter.ore_stock, factory_smelter.MAX_ORE, factory_smelter.metal_stock, factory_smelter.MAX_METAL, production["smelter_status"], production["smelter_progress"], factory_smelter.POWER_KW])
 		elif selected_structure in logistics_depots:
 			hud.set_structure("MAGAZYN POSREDNI", selected_structure.describe())
 		elif selected_structure in solar_arrays:
