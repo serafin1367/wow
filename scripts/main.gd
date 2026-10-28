@@ -1556,7 +1556,8 @@ func _production_snapshot() -> Dictionary:
 			"progress": report["mine_progress"],
 			"paused": factory_mine.production_paused,
 			"cycles_remaining": factory_mine.cycles_remaining,
-			"priority": factory_mine.production_priority})
+			"priority": factory_mine.production_priority,
+			"queue": factory_mine.production_queue.duplicate(true)})
 		if not str(report["mine_status"]) in ["PRACUJE", "WSTRZYMANA", "ZLECENIE WYKONANE"]:
 			alarms.append({"kind": "mine", "message": "KOPALNIA: " + str(report["mine_status"])})
 	if factory_smelter != null:
@@ -1569,7 +1570,8 @@ func _production_snapshot() -> Dictionary:
 			"progress": report["smelter_progress"],
 			"paused": factory_smelter.production_paused,
 			"cycles_remaining": factory_smelter.cycles_remaining,
-			"priority": factory_smelter.production_priority})
+			"priority": factory_smelter.production_priority,
+			"queue": factory_smelter.production_queue.duplicate(true)})
 		if not str(report["smelter_status"]) in ["PRACUJE", "WSTRZYMANA", "ZLECENIE WYKONANE"]:
 			alarms.append({"kind": "smelter", "message": "HUTA: " + str(report["smelter_status"])})
 		if haulers == 0 and ore_conveyor == null and factory_smelter.ore_stock < factory_smelter.ORE_PER_METAL:
@@ -1612,6 +1614,18 @@ func _set_machine_queue(kind: String, cycles: int) -> void:
 	machine.set_production_target(cycles)
 	_update_factory_power()
 	_set_status("%s: %s" % [kind, "produkcja ciagla" if cycles == -1 else "%d cykli" % cycles])
+	_refresh_production_panel()
+
+
+func _enqueue_machine_production(kind: String, cycles: int, priority: int) -> void:
+	var machine = _production_machine(kind)
+	if not is_instance_valid(machine):
+		return
+	if machine.enqueue_production(cycles, priority):
+		_set_status("%s: dodano %d cykli (priorytet %d) do kolejki." % [kind, cycles, priority])
+		_update_factory_power()
+	else:
+		_set_status("Nie mozna dodac partii: 1-1000 cykli, maks. 16 oczekujacych.")
 	_refresh_production_panel()
 
 
@@ -1667,6 +1681,7 @@ func _create_hud() -> void:
 	hud.production_pause_requested.connect(_toggle_machine_pause)
 	hud.production_queue_requested.connect(_set_machine_queue)
 	hud.production_priority_requested.connect(_set_machine_priority)
+	hud.production_enqueue_requested.connect(_enqueue_machine_production)
 	hud.production_focus_requested.connect(_focus_production_machine)
 	hud.planning_requested.connect(_toggle_planning)
 	hud.sticky_requested.connect(_toggle_sticky_build)
