@@ -4,6 +4,42 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.13 — zapis i odczyt kolonii
+
+**Zapis:** kliknij `ZAPISZ` na dolnym pasku albo nacisnij **Ctrl+S** w grze.
+**Odczyt:** `WCZYTAJ` lub **Ctrl+O**. Gra tworzy nowa scene ze stanu
+zapisanych danych; nie nadpisuje istniejacej rozgrywki, gdy plik
+jest uszkodzony, niezgodny z formatem lub nie istnieje.
+
+Lokalny zapis: **`user://wow-save-1.json`** (jeden slot).
+Lokalizacja bezwzgledna zalezy od systemu i `project.godot`;
+na Windows jest to zazwyczaj `%APPDATA%/Godot/app_userdata/<projekt>/`,
+a na Linux `~/.local/share/godot/app_userdata/<projekt>/`.
+
+Zapisywane sa: planeta, zasoby, drzewa i zloza (w tym stopien
+wyczerpania), budynki i ich obroty, roboty (energia, ladunki,
+stany i trasy), akumulatory, uszkodzenia, siatka drog,
+zaplanowane hologramy oraz obie tasmy z paczkami w ruchu.
+Pakiet na tasmociagu zachowuje rodzaj, ilosc i **odleglosc na trasie**.
+Wczytanie odtwarza jego model w odpowiednim miejscu, bez ponownego
+pobrania rudy z kopalni i bez podwojenia dostawy.
+
+**Architektura:** `scripts/save_game_manager.gd` zapisuje
+wersjonowany plik JSON (`schema_version = 1`). Trwale obiekty maja
+`to_dict()` i `from_dict()`, a referencje robotow i maszyn
+odtwarzane sa po stabilnych `save_id` w drugim przebiegu.
+Plik powstaje najpierw jako `.tmp` i jest podmieniany po zapisaniu.
+Nowy format pliku wymaga przyszlych migracji wersji — stare schematy
+sa odrzucane z komunikatem, zamiast byc ladowane czesciowo.
+
+**Test:** `tests/save_load_smoke.gd` sprawdza rzeczywisty plik,
+tworzenie nowej sceny, pelny bufor huty, pakiet znajdujacy sie na
+tasmie, bilans surowcow, porownanie magazynu i poziomu energii,
+a takze odrzucenie uszkodzonego pliku.
+
+**Uwaga:** automatyczny zapis, sloty wielokrotne, migracje starych
+wersji i gra sieciowa jeszcze nie istnieja. Zapis trwa tylko lokalnie.
+
 ## WOW 0.12 — drogi techniczne, projekty kolonii i budowa seryjna
 
 ### Przejezdne drogi techniczne — D
