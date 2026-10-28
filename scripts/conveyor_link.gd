@@ -123,18 +123,20 @@ func _process(delta: float) -> void:
 func _load_packet(requested: int) -> int:
 	if not is_instance_valid(source):
 		return 0
-	if mode == "ore":
-		return source.withdraw(requested)
-	return source.collect_metal(requested)
+	var resource_type: String = "iron_ore" if mode == "ore" else "metal"
+	if source.has_method("withdraw_resource"):
+		return source.withdraw_resource(resource_type, requested)
+	return 0
 
 
 func _unload_packet(requested: int) -> int:
 	if not is_instance_valid(destination):
 		return 0
-	if mode == "ore":
-		return destination.deposit_ore(requested)
-	# Do magazynu trafia tylko metal, nie ruda.
-	return requested
+	var resource_type: String = "iron_ore" if mode == "ore" else "metal"
+	if destination.has_method("deposit_resource"):
+		return destination.deposit_resource(resource_type, requested)
+	# Koncowy magazyn nadal rozlicza zasoby przez sygnal cargo_delivered.
+	return requested if mode == "metal" else 0
 
 
 func _at_distance(distance: float) -> Vector3:
