@@ -102,6 +102,15 @@ func set_recipe_id(new_id: String) -> bool:
 	var selected = RECIPE_REGISTRY.get_recipe(new_id)
 	if selected == null or selected.machine_kind != "smelter":
 		return false
+	# Nowa receptura moze wymagac nowych portow. Do czasu dodania
+	# wielomaterialowego pieca nie dopuszczamy przepisu, ktorego
+	# surowcow huta nie przechowuje.
+	for resource_type in selected.inputs.keys():
+		if not input_buffer.capacity.has(str(resource_type)):
+			return false
+	for resource_type in selected.outputs.keys():
+		if not output_buffer.capacity.has(str(resource_type)):
+			return false
 	# Nie zmieniaj przepisu w srodku cyklu. Przyszly edytor
 	# receptur bedzie mogl zlecić zmiane po jego zakonczeniu.
 	if accumulated > 0.0 and not is_equal_approx(accumulated, 0.0):
@@ -204,8 +213,16 @@ func from_dict(data: Dictionary) -> void:
 	var stored_id: String = str(data.get("recipe_id", DEFAULT_RECIPE_ID))
 	var stored_recipe = RECIPE_REGISTRY.get_recipe(stored_id)
 	if stored_recipe != null and stored_recipe.machine_kind == "smelter":
-		recipe_id = stored_id
-		active_recipe = stored_recipe
+		var ports_supported: bool = true
+		for material in stored_recipe.inputs.keys():
+			if not input_buffer.capacity.has(str(material)):
+				ports_supported = false
+		for material in stored_recipe.outputs.keys():
+			if not output_buffer.capacity.has(str(material)):
+				ports_supported = false
+		if ports_supported:
+			recipe_id = stored_id
+			active_recipe = stored_recipe
 	set_meta("save_id", str(data.get("save_id", "")))
 	if data.has("input_buffer"):
 		input_buffer.from_dict(data["input_buffer"])
