@@ -27,6 +27,7 @@ func _init() -> void:
 	output_buffer.configure("iron_ore", MAX_BUFFER)
 
 var accumulated: float = 0.0
+var total_extracted: int = 0
 var machine_visual = null
 
 
@@ -70,6 +71,7 @@ func _process(delta: float) -> void:
 		if extracted > 0:
 			var accepted: int = output_buffer.push("iron_ore", extracted)
 			assert(accepted == extracted, "Mine output buffer must accept extracted ore")
+			total_extracted += accepted
 			stock_changed.emit()
 
 
@@ -111,7 +113,7 @@ func to_dict() -> Dictionary:
 		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
 		"stock": stock, "accumulated": accumulated,
 		"source_id": str(ore_source.get_meta("save_id", "")) if is_instance_valid(ore_source) else "",
-		"output_buffer": output_buffer.to_dict()}
+		"output_buffer": output_buffer.to_dict(), "total_extracted": total_extracted}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -121,3 +123,4 @@ func from_dict(data: Dictionary) -> void:
 	else:
 		stock = clampi(int(data.get("stock", 0)), 0, MAX_BUFFER)
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
+	total_extracted = maxi(0, int(data.get("total_extracted", 0)))
