@@ -288,7 +288,7 @@ func _process_factory_wait(delta: float) -> void:
 	factory_wait_elapsed = 0.0
 
 	if state == WorkState.WAIT_FACTORY_PICKUP:
-		var ore: int = factory_mine.withdraw(25 - carried_amount)
+		var ore: int = factory_mine.withdraw_resource("iron_ore", 25 - carried_amount)
 		if ore > 0:
 			carried_type = "iron_ore"
 			carried_amount += ore
@@ -299,7 +299,7 @@ func _process_factory_wait(delta: float) -> void:
 
 	elif state == WorkState.WAIT_FACTORY_OUTPUT:
 		if carried_type == "iron_ore" and carried_amount > 0:
-			var accepted: int = factory_smelter.deposit_ore(carried_amount)
+			var accepted: int = factory_smelter.deposit_resource("iron_ore", carried_amount)
 			carried_amount -= accepted
 			if carried_amount == 0:
 				carried_type = ""
@@ -312,7 +312,7 @@ func _process_factory_wait(delta: float) -> void:
 			_travel_factory_stage("pickup")
 			return
 
-		var metal: int = factory_smelter.collect_metal(25)
+		var metal: int = factory_smelter.withdraw_resource("metal", 25)
 		if metal > 0:
 			carried_type = "metal"
 			carried_amount = metal
