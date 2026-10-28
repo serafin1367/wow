@@ -16,6 +16,7 @@ const PLANET_SCRIPT = preload("res://scripts/planet_environment.gd")
 const DEPOT_VISUAL_SCRIPT = preload("res://scripts/depot_model.gd")
 const MINE_SCRIPT = preload("res://scripts/automated_mine.gd")
 const SMELTER_SCRIPT = preload("res://scripts/automated_smelter.gd")
+const WORKSHOP_SCRIPT = preload("res://scripts/automated_workshop.gd")
 const CONVEYOR_SCRIPT = preload("res://scripts/conveyor_link.gd")
 const SOLAR_SCRIPT = preload("res://scripts/solar_array.gd")
 const BATTERY_SCRIPT = preload("res://scripts/battery_bank.gd")
@@ -41,6 +42,7 @@ const DEPOT_BLOCK_RADIUS: float = 3.2
 const IRON_DEPOSIT_POSITION: Vector3 = Vector3(18.0, 0.0, 8.0)
 const MINE_COST: Dictionary = {"wood": 20, "stone": 10}
 const SMELTER_COST: Dictionary = {"wood": 30, "stone": 20}
+const WORKSHOP_COST: Dictionary = {"metal": 10, "stone": 15}
 const SMELTER_RADIUS: float = 3.9
 const ORE_CONVEYOR_COST: Dictionary = {"metal": 5}
 const METAL_CONVEYOR_COST: Dictionary = {"metal": 8}
@@ -84,6 +86,8 @@ var selected_structure = null
 var planet_env = null
 var factory_mine = null
 var factory_smelter = null
+var factory_workshop = null
+var workshop_build_mode: bool = false
 var mine_build_mode: bool = false
 var smelter_build_mode: bool = false
 var unused_power_kw: float = 0.0
@@ -474,6 +478,8 @@ func _build_cost(kind: String) -> Dictionary:
 			return MINE_COST
 		"smelter":
 			return SMELTER_COST
+		"workshop":
+			return WORKSHOP_COST
 		"center":
 			return TOWN_HALL_COST
 		"forester":
@@ -663,6 +669,9 @@ func _spawn_planned_structure(entry: Dictionary) -> void:
 		"smelter":
 			factory_smelter = SMELTER_SCRIPT.new()
 			structure = factory_smelter
+		"workshop":
+			factory_workshop = WORKSHOP_SCRIPT.new()
+			structure = factory_workshop
 		"center":
 			town_hall = TOWN_HALL_SCRIPT.new()
 			structure = town_hall
@@ -697,7 +706,7 @@ func _spawn_planned_structure(entry: Dictionary) -> void:
 			source.collision_layer = 0
 			source.visible = false
 			source.remove_from_group("resource_nodes")
-	if kind in ["mine", "smelter", "solar", "battery"]:
+	if kind in ["mine", "smelter", "workshop", "solar", "battery"]:
 		_connect_power_node(structure)
 	navigation.block_circle(Vector2(site.x, site.z), _build_radius(kind))
 
@@ -742,6 +751,8 @@ func _active_build_kind() -> String:
 		return "mine"
 	if smelter_build_mode:
 		return "smelter"
+	if workshop_build_mode:
+		return "workshop"
 	if build_mode:
 		return "center"
 	if forester_build_mode:
@@ -757,6 +768,8 @@ func _build_radius(kind: String) -> float:
 			return MINE_SCRIPT.CLEARANCE_RADIUS
 		"smelter":
 			return SMELTER_RADIUS
+		"workshop":
+			return WORKSHOP_SCRIPT.CLEARANCE_RADIUS
 		"center":
 			return TOWN_HALL_RADIUS
 		"forester":
@@ -876,6 +889,8 @@ func _can_place_structure_at(site: Vector3, kind: String, ignore_plan_index: int
 				already_planned -= 1
 	if kind == "mine" and already_planned > 0:
 		return false
+	if kind == "workshop" and (factory_workshop != null or already_planned > 0):
+		return false
 	if kind == "smelter" and (factory_smelter != null or already_planned > 0):
 		return false
 	if kind == "center" and (town_hall != null or already_planned > 0):
@@ -969,6 +984,32 @@ func _cancel_build_modes() -> void:
 	forester_build_mode = false
 	mine_build_mode = false
 	smelter_build_mode = false
+	workshop_build_mode = false
+
+
+func _toggle_workshop_mode() -> void:
+	if workshop_build_mode:
+		workshop_build_mode = false
+		return
+	_cancel_build_modes()
+	if factory_workshop != null or not _can_afford(WORKSHOP_COST):
+		_set_status("Warsztat: wymagane 10 metalu i 15 kamienia; maksymalnie jeden.")
+		return
+	workshop_build_mode = true
+	_set_status("Y: wybierz LPM miejsce na warsztat.")
+
+
+func _try_place_workshop(screen_position: Vector2) -> void:
+	var hit: Dictionary = _build_site_at_mouse(screen_position, "workshop")
+	if hit.is_empty() or not _can_place_structure_at(hit["site"], "workshop"):
+		_set_status("Warsztat: zajety teren.")
+		return
+	if not _spend_resources(WORKSHOP_COST):
+		return
+	_spawn_planned_structure({"kind": "workshop", "site": hit["site"], "quarters": placement_rotation_quarters})
+	workshop_build_mode = false
+	_update_factory_power()
+	_set_status("Warsztat gotowy. Produkcja stali i elektroniki.")
 
 
 func _toggle_mine_mode() -> void:
@@ -1165,9 +1206,13 @@ func _update_factory_power() -> void:
 		machines.append(factory_mine)
 	if factory_smelter != null:
 		machines.append(factory_smelter)
+	if factory_workshop != null:
+		machines.append(factory_workshop)
 	machines.sort_custom(func(left, right): return int(left.production_priority) > int(right.production_priority))
 	for machine in machines:
 		var required_power: float = machine.POWER_KW
+		if machine == factory_workshop and factory_workshop.active_recipe != null:
+			required_power = factory_workshop.active_recipe.power_kw
 		if machine == factory_smelter and factory_smelter.active_recipe != null:
 			required_power = factory_smelter.active_recipe.power_kw
 		machine.power_enabled = not machine.production_paused and machine.cycles_remaining != 0 and budget + 0.001 >= required_power
@@ -1531,6 +1576,7 @@ func _production_machine(kind: String):
 	match kind:
 		"mine": return factory_mine
 		"smelter": return factory_smelter
+		"workshop": return factory_workshop
 	return null
 
 
@@ -1759,6 +1805,8 @@ func _update_colony_hud() -> void:
 			hud.set_structure("MODUL REKULTYWACJI", "Odnawianie drzew: cykl 8 sekund.")
 		elif selected_structure == factory_mine:
 			hud.set_structure("KOPALNIA ZELAZA", "WEJ: zloze | WYJ: 4 rudy / 1.5s\nBufor %d/%d | %s\nCykl %.0f%% | Moc %.1f kW" % [factory_mine.stock, factory_mine.MAX_BUFFER, production["mine_status"], production["mine_progress"], factory_mine.POWER_KW])
+		elif selected_structure == factory_workshop:
+			hud.set_structure("WARSZTAT", factory_workshop.describe())
 		elif selected_structure == factory_smelter:
 			hud.set_structure("HUTA METALU", "WEJ: 2 rudy | WYJ: 1 metal / 3s\nRuda %d/%d, metal %d/%d\n%s | Cykl %.0f%% | %.1f kW" % [factory_smelter.ore_stock, factory_smelter.MAX_ORE, factory_smelter.metal_stock, factory_smelter.MAX_METAL, production["smelter_status"], production["smelter_progress"], factory_smelter.POWER_KW])
 		elif selected_structure in logistics_depots:
@@ -1843,6 +1891,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_M:
 			_toggle_mine_mode()
 			return
+		if event.keycode == KEY_Y:
+			_toggle_workshop_mode()
+			return
 		if event.keycode == KEY_H:
 			_toggle_smelter_mode()
 			return
@@ -1886,7 +1937,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cancel_manual_conveyor()
 			_set_status("Anulowano reczne ukladanie tasmy.")
 			return
-		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode or depot_build_mode):
+		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode or workshop_build_mode or depot_build_mode):
 			_cancel_build_modes()
 			_set_status("Anulowano budowe.")
 			return
@@ -1925,6 +1976,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mine_build_mode:
 			if event.pressed:
 				_try_place_mine(event.position)
+			return
+		if workshop_build_mode:
+			if event.pressed:
+				_try_place_workshop(event.position)
 			return
 		if smelter_build_mode:
 			if event.pressed:
@@ -1982,7 +2037,7 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 	var building_hit := _raycast(screen_position, 8)
 	if building_hit.has("collider"):
 		var structure = building_hit["collider"]
-		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter or structure in solar_arrays or structure in battery_banks or structure in logistics_depots:
+		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter or structure == factory_workshop or structure in solar_arrays or structure in battery_banks or structure in logistics_depots:
 			selected_structure = structure
 			if structure == town_hall:
 				_set_status("Centrum: T szkoli kolejnego gornika.")
@@ -1994,6 +2049,8 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 				_set_status("Ladowarka: C wysyla zaznaczone roboty do ladowania.")
 			elif structure == factory_mine:
 				_set_status("Kopalnia: %s" % factory_mine.describe())
+			elif structure == factory_workshop:
+				_set_status("Warsztat: " + factory_workshop.describe())
 			elif structure == factory_smelter:
 				_set_status("Huta: %s" % factory_smelter.describe())
 			elif structure in solar_arrays or structure in battery_banks or structure in logistics_depots:
