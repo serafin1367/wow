@@ -32,7 +32,9 @@ func to_dict(game: Node3D) -> Dictionary:
 		var stable_id: String = "deposit:" + resource.name if resource.name in RESOURCE_NAMES else "resource:%s:%d:%d" % [resource.resource_type, roundi(p.x * 10.0), roundi(p.z * 10.0)]
 		_id(resource, stable_id)
 		var record: Dictionary = resource.to_dict()
-		record["node_name"] = resource.name
+		# Godot automatycznie zmienia nazwy rodzenstwa Tree na Tree2 / @...;
+		# logiczny typ zrodla nie moze zalezec od nazwy Node.
+		record["node_name"] = "Tree" if resource.resource_type == "wood" else resource.name
 		resources.append(record)
 	# Zloze pod kopalnia nie nalezy juz do grupy resource_nodes.
 	var iron = game.get_node_or_null("IronOreDeposit")
