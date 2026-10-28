@@ -20,6 +20,7 @@ var total_cycles: int = 0
 var total_steel: int = 0
 var total_electronics: int = 0
 var machine_visual: Node3D
+var assembly_arm: MeshInstance3D
 
 func _init() -> void:
 	assert(active_recipe != null and active_recipe.is_valid())
@@ -42,6 +43,7 @@ func _ready() -> void:
 	_add_box("Base", Vector3(0, 0.25, 0), Vector3(5.2, 0.5, 4.8), steel_material)
 	_add_box("AssemblyHousing", Vector3(0, 1.6, -0.3), Vector3(3.5, 2.2, 2.7), steel_material)
 	_add_box("AssemblyArm", Vector3(0, 3.0, 0.3), Vector3(0.5, 1.5, 0.5), accent)
+	assembly_arm = machine_visual.get_node("AssemblyArm")
 	_add_box("InputDock", Vector3(-2.3, 0.8, 0), Vector3(0.8, 0.9, 1.4), accent)
 	_add_box("OutputDock", Vector3(2.3, 0.8, 0), Vector3(0.8, 0.9, 1.4), accent)
 	var collider := CollisionShape3D.new()
@@ -62,6 +64,8 @@ func _add_box(label: String, pos: Vector3, dimensions: Vector3, material: Materi
 	machine_visual.add_child(mesh_node)
 
 func _process(delta: float) -> void:
+	if assembly_arm != null and power_enabled and not production_paused and cycles_remaining != 0 and active_recipe.can_process(input_buffer, output_buffer):
+		assembly_arm.rotation.y += delta * 3.0
 	if active_recipe == null or not power_enabled or production_paused or cycles_remaining == 0:
 		return
 	if not active_recipe.can_process(input_buffer, output_buffer):
