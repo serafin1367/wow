@@ -4,6 +4,23 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.14 — logistyka: wspolny bufor (rozpoczete)
+
+Powstal pierwszy komponent architektury nastepnej wersji:
+`scripts/inventory.gd` — **wspolny interfejs zasobow dla robotow i tasmiociagow**.
+Jest niezalezny od `Node`, umozliwia rezerwacje materialu przy zrodle
+i miejsca przy odbiorcy, bez podwojnego przydzielenia tego samego ladunku.
+Mozna wykonywac transfer z ograniczona pojemnoscia i serializowac
+bufory wraz z aktywnymi rezerwacjami (`to_dict` / `from_dict`).
+
+**Wazne:** modul jest na razie przygotowany i przetestowany jednostkowo.
+Istniejaca kopalnia, huta, roboty i tasmy **nie zostaly jeszcze przepiete**
+na `Inventory`; to kolejne zadanie WOW 0.14. Aktualny system dostaw
+dziala nadal wedlug logiki WOW 0.13.
+
+Test: `tests/inventory_smoke.gd` (pojemnosc, rezerwacje, anulowanie,
+zapis/odczyt w trakcie transportu i bilans materialowy).
+
 ## WOW 0.13 — zapis i odczyt kolonii
 
 **Zapis:** kliknij `ZAPISZ` na dolnym pasku albo nacisnij **Ctrl+S** w grze.
