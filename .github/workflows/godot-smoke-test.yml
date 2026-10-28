@@ -87,6 +87,16 @@ jobs:
             echo "Building occupancy and build preview integration test failed."
             exit 1
           fi
+      - name: Verify 3D construction ghosts, orientation and grid snapping
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/building_ghost_smoke.gd 2>&1 | tee /tmp/wow-build-ghost.log
+          grep -F 'GHOST SMOKE OK' /tmp/wow-build-ghost.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|GHOST TEST:' /tmp/wow-build-ghost.log; then
+            echo "Build hologram rotation or snapping test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
