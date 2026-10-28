@@ -13,6 +13,11 @@ signal ore_conveyor_requested
 signal metal_conveyor_requested
 signal solar_array_requested
 signal battery_bank_requested
+signal road_requested
+signal planning_requested
+signal sticky_requested
+signal commit_plan_requested
+signal clear_plan_requested
 
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
@@ -43,6 +48,10 @@ var balance_label: Label
 var storage_label: Label
 var solar_button: Button
 var battery_button: Button
+var road_button: Button
+var planning_button: Button
+var sticky_button: Button
+var plan_info_label: Label
 
 
 func _ready() -> void:
@@ -90,7 +99,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.11", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.12", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -129,7 +138,7 @@ func _make_bottom_bar() -> void:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 14
 	bar.offset_right = -14
-	bar.offset_top = -244
+	bar.offset_top = -275
 	bar.offset_bottom = -14
 
 	var margin := _margins(16, 12, 16, 10)
@@ -215,6 +224,35 @@ func _make_bottom_bar() -> void:
 	battery_button.custom_minimum_size.y = 32
 	battery_button.pressed.connect(func(): battery_bank_requested.emit())
 	energy_actions.add_child(battery_button)
+	road_button = _action_button("D   DROGI", "Wyznacz trase, Enter buduje; 1 kamien / 4 nowe pola.", ORANGE)
+	road_button.custom_minimum_size.y = 32
+	road_button.pressed.connect(func(): road_requested.emit())
+	energy_actions.add_child(road_button)
+	planning_button = _action_button("F   PROJEKT", "LPM planuje budynki, Enter buduje wszystkie.", TURQUOISE)
+	planning_button.custom_minimum_size.y = 32
+	planning_button.pressed.connect(func(): planning_requested.emit())
+	energy_actions.add_child(planning_button)
+	sticky_button = _action_button("X   SERIA", "Po wybudowaniu automatycznie przejdz do nastepnego budynku.", ORANGE)
+	sticky_button.custom_minimum_size.y = 32
+	sticky_button.pressed.connect(func(): sticky_requested.emit())
+	energy_actions.add_child(sticky_button)
+
+	var plan_row := HBoxContainer.new()
+	plan_row.add_theme_constant_override("separation", 8)
+	center.add_child(plan_row)
+	plan_info_label = _label("PROJEKT: 0 elementow", 11, TURQUOISE, true)
+	plan_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	plan_row.add_child(plan_info_label)
+	var accept_plan := Button.new()
+	accept_plan.text = "ENTER  BUDUJ"
+	accept_plan.tooltip_text = "Zatwierdz caly projekt budowy"
+	accept_plan.pressed.connect(func(): commit_plan_requested.emit())
+	plan_row.add_child(accept_plan)
+	var clear_plan := Button.new()
+	clear_plan.text = "USUN PLAN"
+	clear_plan.tooltip_text = "Usun niezrealizowane hologramy"
+	clear_plan.pressed.connect(func(): clear_plan_requested.emit())
+	plan_row.add_child(clear_plan)
 
 	event_label = _label("Gotowosc systemow kolonii.", 13, TEXT)
 	event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -233,6 +271,8 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("Q/E   Obroc kamere", 12, TEXT))
 	help.add_child(_label("R / Shift+R   Obrot budynku", 12, ORANGE))
 	help.add_child(_label("G   Siatka 1/2/4 m", 12, TEXT))
+	help.add_child(_label("D   Droga | F   Plan", 12, TURQUOISE))
+	help.add_child(_label("X   Budowa seryjna", 12, TEXT))
 	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
 	help.add_child(_label("ENTER   Zbuduj trase", 12, TEXT))
 	help.add_child(_label("ESC   Anuluj budowe", 12, TEXT))
@@ -284,6 +324,15 @@ func set_energy_build_availability(solar_count: int, solar_limit: int, battery_c
 		solar_button.disabled = solar_count >= solar_limit
 	if battery_button != null:
 		battery_button.disabled = battery_count >= battery_limit
+
+
+func set_planning_state(planning: bool, repeat_mode: bool, count: int, cost: String) -> void:
+	if planning_button != null:
+		planning_button.text = "F   PLAN %s" % ("ON" if planning else "OFF")
+	if sticky_button != null:
+		sticky_button.text = "X   SERIA %s" % ("ON" if repeat_mode else "OFF")
+	if plan_info_label != null:
+		plan_info_label.text = "PROJEKT: %d | %s" % [count, cost if cost != "" else "brak kosztow"]
 
 
 func set_status(message: String) -> void:
