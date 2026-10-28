@@ -23,6 +23,7 @@ const POWER_CABLE_SCRIPT = preload("res://scripts/power_cable.gd")
 const BUILD_PREVIEW_SCRIPT = preload("res://scripts/build_placement_preview.gd")
 const ROADS_SCRIPT = preload("res://scripts/technical_roads.gd")
 const BLUEPRINTS_SCRIPT = preload("res://scripts/construction_blueprints.gd")
+const SAVE_SCRIPT = preload("res://scripts/save_game_manager.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
@@ -98,6 +99,7 @@ var road_mode: bool = false
 var road_anchors: Array[Vector3] = []
 var road_preview_route: Array[Vector2i] = []
 var road_hover_elapsed: float = 0.0
+var save_manager = SAVE_SCRIPT.new()
 
 
 func _ready() -> void:
@@ -113,6 +115,29 @@ func _ready() -> void:
 	_create_build_preview()
 	_create_infrastructure_planner()
 	_create_training_timer()
+
+
+func _save_game() -> void:
+	if save_manager.save_file(self):
+		_set_status("Zapisano kolonie w user://wow-save-1.json (Ctrl+S).")
+	else:
+		_set_status("Nie udalo sie zapisac gry. Sprawdz uprawnienia katalogu danych.")
+
+
+func _load_game() -> void:
+	var loaded: Dictionary = save_manager.read_file()
+	if loaded.is_empty():
+		_set_status("Brak poprawnego zapisu WOW 0.13. Nie zmieniono biezacej gry.")
+		return
+	var fresh = load("res://scenes/main.tscn").instantiate()
+	get_tree().root.add_child(fresh)
+	if not save_manager.from_dict(fresh, loaded):
+		fresh.queue_free()
+		_set_status("Odczyt nie powiodl sie: pozostawiono dotychczasowa kolonie.")
+		return
+	get_tree().current_scene = fresh
+	fresh._set_status("Wczytano kolonie z user://wow-save-1.json.")
+	queue_free()
 
 
 func _create_environment() -> void:
@@ -1375,6 +1400,8 @@ func _create_hud() -> void:
 	hud.sticky_requested.connect(_toggle_sticky_build)
 	hud.commit_plan_requested.connect(_confirm_blueprints)
 	hud.clear_plan_requested.connect(_clear_blueprints)
+	hud.save_requested.connect(_save_game)
+	hud.load_requested.connect(_load_game)
 	hud.planet_change_requested.connect(_cycle_planet)
 	add_child(hud)
 
@@ -1451,6 +1478,12 @@ func _charge_selected() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.ctrl_pressed and event.keycode == KEY_S:
+			_save_game()
+			return
+		if event.ctrl_pressed and event.keycode == KEY_O:
+			_load_game()
+			return
 		if event.keycode == KEY_D:
 			_start_road_mode()
 			return
