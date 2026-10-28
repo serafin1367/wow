@@ -93,3 +93,17 @@ func _material(tint: Color, glowing: bool = false) -> StandardMaterial3D:
 	if glowing:
 		result.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return result
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "position":
+		[global_position.x, global_position.y, global_position.z],
+		"rotation_y": rotation.y, "plant_attempts": plant_attempts,
+		"timer_left": planting_timer.time_left if planting_timer != null else 0.0}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	plant_attempts = int(data.get("plant_attempts", 0))
+	if planting_timer != null and planting_timer.is_inside_tree():
+		planting_timer.start(maxf(0.01, float(data.get("timer_left", 8.0))))
