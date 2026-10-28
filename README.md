@@ -4,64 +4,68 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
-## WOW 0.14 — logistyka i magazyny posrednie (w trakcie testow)
+## WOW 0.14 — zarzadzanie logistyka i magazynami posrednimi
 
-**Nowy budynek:** U otwiera tryb budowy magazynu posredniego (`DEPOT`).
-Cena: **15 drewna + 10 kamienia**, limit: 3 magazyny.
-Podglad 3D, zielona/czerwona siatka, obroty R i tryb planowania F
-dzialaja tak samo jak dla innych konstrukcji. Kazdy magazyn ma
-5 rozdzielonych zasobow (drewno, kamien, zloto, ruda zelaza, metal)
-o pojemnosci **120 jednostek na rodzaj**. Kliknij budynek, aby zobaczyc stan.
+**Budowa:** `U` otwiera projekt magazynu posredniego, cena **15 drewna +
+10 kamienia**, maksymalnie 3 magazyny. Mozna uzyc `F` do planowania
+i `R` do obrotu. Kazdy magazyn obsluguje drewno, kamien, zloto,
+rude zelaza oraz metal; kazdy zasob ma osobny bufor o limicie 120.
+Klikniecie magazynu pokazuje jego aktualny stan.
 
-**Wspolny bufor** `scripts/inventory.gd` jest podlaczony do wydobycia
-rudy i przetapiania metalu. Roboty i tasmy pobieraja i oddaja surowce
-przez wspolne funkcje `withdraw_resource()` / `deposit_resource()`,
-ktore uwzgledniaja zajetosc i rezerwacje. Istniejace klawisze J/N
-i sterowanie robotami sa nadal obslugiwane.
+**O — CENTRUM LOGISTYKI:** przycisk `O LOGISTYKA` na dolnym pasku
+lub klawisz **O** otwiera panel:
+1. Wybierz magazyn i surowiec z listy.
+2. Ustaw poziom **MIN** (ile zostawic dla kolonii) i **MAX**
+   (do jakiego poziomu mozna dostarczac). Kliknij **ZASTOSUJ**.
+3. Ponizej widoczne sa aktywne zlecenia. Wybierz priorytet
+   **0–200** i kliknij **OK**. Zmiana priorytetu tej trasy
+   obowiazuje takze dla przyszlych zlecen.
+4. **ANULUJ** jest dozwolone tylko przed zaladunkiem: rezerwacje
+   zostaja wycofane i surowce pozostaja w buforze nadawcy.
+5. Po odbiorze paczki pojawia sie lista **NOWY CEL**.
+   Wybierz drugi magazyn (dla metalu mozliwy jest tez
+   **SKLAD GLOWNY**) i kliknij **ZMIEN CEL**.
+   System najpierw sprawdzi trase i zarezerwuje miejsce u nowego
+   odbiorcy. W razie bledu stara rezerwacja i ladunek
+   pozostaja bez zmian.
+Przycisk **ODSWIEZ** pobiera aktualna kolejke i stany buforow.
+Panel mozna zamknac przez `O` lub `X`.
 
-**Zlecenia automatyczne:** jezeli istnieja kopalnia, huta i magazyn
-posredni, `scripts/logistics_manager.gd` przydziela wolnym
-transportowcom prace wedlug priorytetow:
-- magazyn posredni -> glowny sklad (metal; najwyzszy priorytet),
-- magazyn posredni -> huta (ruda),
-- huta -> magazyn posredni (metal),
-- kopalnia -> magazyn posredni (ruda).
+**Transportowce:** `Shift+T` lub przycisk TRANSPORT na dolnym pasku
+szkoli nowego transportowca w centrum dowodzenia za 10 drewna
+i 20 zlota. Mozna zarzadzac kilkoma robotami i magazynami.
+`scripts/logistics_manager.gd` przydziela zlecenia wedlug
+priorytetow, kontroluje rezerwacje i zabezpiecza je przed
+podwojnym pobraniem. Po trzech nieudanych probach wyznaczenia
+trasy system zwalnia rezerwacje i wstrzymuje kolejne proby na
+kilkanascie cykli przydzialu; gracz moze w tym czasie zbudowac droge
+lub usunac przeszkode. Robot z juz odebranym ladunkiem
+czeka na ponowny dostep lub reczne przekierowanie — nie usuwa
+przewozonego materialu.
 
-Kazde zlecenie rezerwuje towar u nadawcy i miejsce w buforze odbiorcy.
-Jednostka podczas dostawy ma wlasnosc ladunku, ktory nie moze byc
-rowoczesnie zabrany przez druga jednostke ani tasme. Priorytety nie
-zastepuja recznych komend dla pozostalych rodzajow robotow.
-Wspolna logistyka zaczyna dzialac po zbudowaniu pierwszego magazynu
-posredniego; bez niego nadal obowiazuje poprzednia trasa fabryczna.
+**Zapis gry:** `Ctrl+S` i `Ctrl+O` utrwalaja magazyny,
+limity MIN/MAX, nadane priorytety tras, rezerwacje, zlecenia
+w trakcie dostawy, docelowe magazyny i ladunki robotow.
 
-**Zapis/odczyt:** magazyny, ich rezerwacje i zlecenia transportowe
-sa czescia wersjonowanego zapisu WOW 0.13. Wczytywanie odtwarza
-najpierw budynki, potem relacje miedzy robotami i magazynami.
+**Architektura:** `scripts/inventory.gd`, `scripts/logistics_manager.gd`,
+`scripts/logistics_depot.gd`, `scripts/logistics_panel.gd`.
+Kopalnia, huta, roboty i tasmy uzywaja jednego kontraktu
+`withdraw_resource` / `deposit_resource` i portow
+`get_input_port` / `get_output_port`.
 
-Testy: `tests/inventory_smoke.gd`,
-`tests/logistics_depot_smoke.gd` i
-`tests/logistics_jobs_smoke.gd` (ten ostatni jest nowym testem
-regresyjnym zlecenia podczas jazdy i wymaga potwierdzenia na CI).
+**Testy CI:** `inventory_smoke`, `logistics_depot_smoke`,
+`logistics_jobs_smoke`, `logistics_multidepot_smoke`,
+`logistics_panel_smoke`, `logistics_recovery_smoke`,
+`logistics_redirect_smoke`, `logistics_fleet_smoke`
+oraz `save_load_smoke`. Ten ostatni dotyczy rowniez
+transportu w trakcie jazdy. `logistics_fleet_smoke` testuje
+20 robotow przez 300 krokow fizyki z wylaczona nowa
+produkcja rudy/metalu, aby izolowac bilans transportu.
 
-**Flota i wiele magazynow:** Shift+T (lub przycisk TRANSPORT na
-dolnym pasku) szkoli kolejnego transportowca za 10 drewna i 20 zlota
-w centrum dowodzenia. Zlecenia mozna realizowac rownolegle przez
-kilka robotow. Przy wielu magazynach menedzer analizuje bufory
-**wszystkich** depotow, bez podwojnego rezerwowania wyjscia kopalni.
-
-**Limity i priorytety (API):**
-`LogisticsDepot.set_stock_limits(resource_type, minimum, maximum)`
-oraz `LogisticsManager.set_priority(job_id, priority)` pozwalaja
-sterowac transportem. Ustawienia limitow i aktywne rezerwacje
-sa zapisywane i odtwarzane. `LogisticsManager.cancel(job_id, workers)`
-bezpiecznie anuluje zadania *przed* odbiorem towaru; zlecenia
-z ladunkiem w trasie trzeba dokonczyc.
-
-**Ograniczenia:** nie ma jeszcze widocznego edytora limitow
-min./maks. i priorytetow w HUD, automatyka nie optymalizuje tras
-miedzy wieloma magazynami wedlug odleglosci, a zmiana celu po
-odebraniu ladunku wymaga obslugi w kolejnym etapie.
-Brak drogi pozostawia zlecenie w kolejce.
+**Ograniczenia:** nie ma jeszcze wyboru optymalnego magazynu
+na podstawie kosztu drogi ani panelu produkcji wszystkich maszyn
+(to kolejny etap WOW 0.15). Graficzny uklad nowego panelu
+w roznych rozdzielczosciach wymaga jeszcze recznego testu w Godocie.
 
 ## WOW 0.13 — zapis i odczyt kolonii
 
