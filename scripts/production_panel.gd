@@ -31,6 +31,7 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", style)
 	_fit_viewport()
 	get_viewport().size_changed.connect(_fit_viewport)
+	call_deferred("_fit_viewport")
 
 	var margins := MarginContainer.new()
 	margins.add_theme_constant_override("margin_left", 14)
@@ -81,8 +82,21 @@ func _fit_viewport() -> void:
 	var width: float = minf(540.0, maxf(290.0, bounds.x - 30.0))
 	offset_left = -width - 12.0
 	offset_right = -12.0
-	offset_top = 106.0 if bounds.y > 670.0 else 62.0
-	offset_bottom = maxf(offset_top + 245.0, bounds.y - 278.0)
+	# Dokladne rozmiary paneli HUD moga przekraczac nominalne kotwice
+	# po zmianie rozdzielczosci lub czcionek. Bierzemy ich rzeczywiste
+	# krawedzie, zeby nie zaslaniac gornego i dolnego paska.
+	var top_edge: float = 102.0
+	var bottom_edge: float = bounds.y - 278.0
+	var parent = get_parent()
+	if parent != null:
+		var status = parent.get_node_or_null("TopStatusBar") as Control
+		var commands = parent.get_node_or_null("CommandBar") as Control
+		if status != null:
+			top_edge = maxf(top_edge, status.position.y + status.size.y + 8.0)
+		if commands != null:
+			bottom_edge = minf(bottom_edge, commands.position.y - 8.0)
+	offset_top = top_edge
+	offset_bottom = maxf(top_edge + 180.0, bottom_edge)
 
 
 func _label(value: String, size: int, color: Color = FG_COLOR) -> Label:
