@@ -82,6 +82,19 @@ func _run() -> void:
 	if not has_power_alarm:
 		_fail("Brak alarmu braku zasilania")
 		return
+	# Przy ograniczonej energii priorytet gracza wybiera aktywna maszyne.
+	smelter.set_production_target(-1)
+	game.landing_rocket.health = 55.0
+	game._update_factory_power()
+	if not mine.power_enabled or smelter.power_enabled:
+		_fail("Przy niedoborze mocy domyslny priorytet kopalni nie jest respektowany")
+		return
+	panel.priority_requested.emit("smelter", 180)
+	if smelter.production_priority != 180 or not smelter.power_enabled or mine.power_enabled:
+		_fail("Priorytet ustawiony przez UI nie zmienil przydzialu zasilania")
+		return
+	smelter.set_production_target(0)
+	game._update_factory_power()
 	# Wylacz proces przed testem round-trip, zeby parametry nie zmienialy sie w trakcie.
 	game.set_process(false)
 	var saved: Dictionary = game.SAVE_SCRIPT.new().to_dict(game)
@@ -89,6 +102,9 @@ func _run() -> void:
 	root.add_child(fresh)
 	if not game.SAVE_SCRIPT.new().from_dict(fresh, saved):
 		_fail("Nie mozna odczytac gry z zakonczona kolejka produkcji")
+		return
+	if fresh.factory_smelter.production_priority != 180:
+		_fail("Priorytet energetyczny huty nie zachowal sie po odczycie")
 		return
 	if fresh.factory_smelter.cycles_remaining != 0 or fresh.factory_smelter.metal_stock != 3:
 		_fail("Po zapisie huta zgubila plan produkcji lub wytworzony metal")
@@ -100,7 +116,7 @@ func _run() -> void:
 	if panel.visible:
 		_fail("Panel nie zamknal sie po ponownym V")
 		return
-	print("PRODUCTION CONSOLE SMOKE OK: pause, finite queues, no idle power, robots, focus, alarms, save/load")
+	print("PRODUCTION CONSOLE SMOKE OK: pause, finite queues, energy priority, robots, focus, alarms, save/load")
 	game.queue_free()
 	fresh.queue_free()
 	await process_frame
