@@ -3,7 +3,7 @@ extends StaticBody3D
 const INVENTORY = preload("res://scripts/inventory.gd")
 const CLEARANCE_RADIUS: float = 3.2
 const CAPACITY_PER_RESOURCE: int = 120
-const ACCEPTED: Array[String] = ["wood", "stone", "gold", "iron_ore", "metal"]
+const ACCEPTED: Array[String] = ["wood", "stone", "gold", "iron_ore", "metal", "steel", "electronics"]
 
 var cargo = INVENTORY.new("building:depot:buffer")
 var minimum_stock: Dictionary = {}

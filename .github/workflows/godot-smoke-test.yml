@@ -46,6 +46,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|RECIPE TEST:' /tmp/wow-recipes.log; then
             exit 1
           fi
+      - name: Test WOW 0.16 assembly workshop and resource conservation
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 60s godot --headless --path . --script res://tests/workshop_smoke.gd 2>&1 | tee /tmp/wow-workshop.log
+          grep -F 'WORKSHOP SMOKE OK' /tmp/wow-workshop.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|WORKSHOP SMOKE:' /tmp/wow-workshop.log; then
+            exit 1
+          fi
       - name: Test mine smelter transport and power accounting
         shell: bash
         run: |

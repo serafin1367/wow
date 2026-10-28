@@ -4,6 +4,31 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.16 — warsztat montazu (PR #1)
+
+W nowej wersji rozwojowej **Y** wlacza budowe warsztatu (10 metalu + 15 kamienia).
+Wybierz wolny teren LPM; warsztat ma proceduralny model 3D z animowanym
+ramieniem, zasilanie z sieci kolonii i wlasne bufory wejsciowe/wyjsciowe.
+
+- Receptura `forge_steel`: 2 metal -> 1 stal, 5 sekund, 3 kW.
+- Receptura `assemble_electronics`: 1 metal + 1 stal -> 1 elektronika,
+  8 sekund, 2 kW.
+- Po zaznaczeniu warsztatu **Shift+Y** przelacza recepture, ale tylko
+  gdy nie rozpoczeto cyklu produkcyjnego. Panel **V** pokazuje status,
+  postep, zapasy i pauze.
+- Magazyny posrednie przechowuja stal i elektronike; `LogisticsManager`
+  tworzy rezerwowane dostawy przez wspolne porty `Inventory`.
+- Zapis `Ctrl+S` i odczyt `Ctrl+O` obejmuje stan warsztatu.
+  Wczesniejsze zapisy bez tego budynku pozostaja kompatybilne.
+
+Testy: `tests/workshop_smoke.gd` i dotychczasowe testy
+`tests/recipe_registry_smoke.gd` w GitHub Actions.
+
+**Ograniczenia obecnego PR:** koszt innych konstrukcji nie wymaga jeszcze
+stali/elektroniki; brak osobnego przycisku budowy warsztatu i wyboru
+receptury w HUD (na razie klawisze Y/Shift+Y). Wizualny odbior na Windows
+pozostaje do wykonania.
+
 ## WOW 0.16 — rejestr receptur (etap 1)
 
 Wspolna definicja produkcji znajduje sie w `scripts/production_recipe.gd`,
