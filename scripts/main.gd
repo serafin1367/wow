@@ -596,11 +596,22 @@ func _build_site_at_mouse(screen_position: Vector2, kind: String) -> Dictionary:
 	return {"site": site}
 
 
-func _build_grid_cell_free(cell: Vector2i, kind: String = "") -> bool:
+func _build_grid_cell_free(cell: Vector2i, kind: String = "", ignore_plan_index: int = -1) -> bool:
 	# Ta sama siatka przeszkod, z ktorej korzystaja roboty. Zloze zelaza
 	# moze zostac zajete WYLACZNIE przez kopalnie.
 	if abs(cell.x) > 43 or abs(cell.y) > 43:
 		return false
+	if roads != null and roads.has_cell(cell):
+		return false
+	if blueprints != null:
+		for index in range(blueprints.entries.size()):
+			if index == ignore_plan_index:
+				continue
+			var draft: Dictionary = blueprints.entries[index]
+			var center: Vector3 = draft["site"]
+			var radius: float = _build_radius(draft["kind"])
+			if Vector2(float(cell.x), float(cell.y)).distance_squared_to(Vector2(center.x, center.z)) <= radius * radius:
+				return false
 	var count: int = int(navigation.obstacle_counts.get(cell, 0))
 	if kind == "mine":
 		var source = _mine_resource()
@@ -612,7 +623,7 @@ func _build_grid_cell_free(cell: Vector2i, kind: String = "") -> bool:
 	return count <= 0
 
 
-func _can_place_structure_at(site: Vector3, kind: String) -> bool:
+func _can_place_structure_at(site: Vector3, kind: String, ignore_plan_index: int = -1) -> bool:
 	var radius: float = _build_radius(kind)
 	if radius <= 0.0:
 		return false
@@ -622,21 +633,29 @@ func _can_place_structure_at(site: Vector3, kind: String) -> bool:
 		var source = _mine_resource()
 		if source == null or _ground_distance(site, source.global_position) > 0.1:
 			return false
-	if kind == "smelter" and factory_smelter != null:
+	var already_planned: int = 0
+	if blueprints != null:
+		already_planned = blueprints.count_kind(kind)
+		if ignore_plan_index >= 0 and ignore_plan_index < blueprints.entries.size():
+			if blueprints.entries[ignore_plan_index]["kind"] == kind:
+				already_planned -= 1
+	if kind == "mine" and already_planned > 0:
 		return false
-	if kind == "center" and town_hall != null:
+	if kind == "smelter" and (factory_smelter != null or already_planned > 0):
 		return false
-	if kind == "forester" and foresters.size() >= MAX_FORESTERS:
+	if kind == "center" and (town_hall != null or already_planned > 0):
 		return false
-	if kind == "solar" and solar_arrays.size() >= MAX_SOLAR_ARRAYS:
+	if kind == "forester" and foresters.size() + already_planned >= MAX_FORESTERS:
 		return false
-	if kind == "battery" and battery_banks.size() >= MAX_BATTERIES:
+	if kind == "solar" and solar_arrays.size() + already_planned >= MAX_SOLAR_ARRAYS:
+		return false
+	if kind == "battery" and battery_banks.size() + already_planned >= MAX_BATTERIES:
 		return false
 	# Badamy caly obrys budynku, nie tylko pole pod kursorem.
 	for x in range(floori(site.x - radius), ceili(site.x + radius) + 1):
 		for z in range(floori(site.z - radius), ceili(site.z + radius) + 1):
 			if Vector2(float(x), float(z)).distance_squared_to(Vector2(site.x, site.z)) <= radius * radius:
-				if not _build_grid_cell_free(Vector2i(x, z), kind):
+				if not _build_grid_cell_free(Vector2i(x, z), kind, ignore_plan_index):
 					return false
 	# Dodatkowo sprawdzamy realne polozenie budynkow i zrodel
 	# (okragi na siatce A* sa dyskretne, wiec moglyby zostawic szczeliny).
@@ -659,6 +678,13 @@ func _can_place_structure_at(site: Vector3, kind: String) -> bool:
 			continue
 		if resource.remaining > 0 or resource.is_sapling:
 			reserved.append({"node": resource, "radius": resource.clearance_radius})
+	if blueprints != null:
+		for index in range(blueprints.entries.size()):
+			if index == ignore_plan_index:
+				continue
+			var draft: Dictionary = blueprints.entries[index]
+			if _ground_distance(site, draft["site"]) < radius + _build_radius(draft["kind"]) + 0.25:
+				return false
 	for occupied in reserved:
 		var node = occupied["node"]
 		if is_instance_valid(node) and node != null:
