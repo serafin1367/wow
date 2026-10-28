@@ -7,6 +7,7 @@ const MINE = preload("res://scripts/automated_mine.gd")
 const SMELTER = preload("res://scripts/automated_smelter.gd")
 const SOLAR = preload("res://scripts/solar_array.gd")
 const BATTERY = preload("res://scripts/battery_bank.gd")
+const DEPOT = preload("res://scripts/logistics_depot.gd")
 
 const VALID_COLOR: Color = Color(0.24, 0.98, 0.68, 0.47)
 const INVALID_COLOR: Color = Color(1.0, 0.24, 0.19, 0.48)
@@ -61,6 +62,8 @@ func _build_model(kind: String) -> Node3D:
 			return SOLAR.new()
 		"battery":
 			return BATTERY.new()
+		"depot":
+			return DEPOT.new()
 	return null
 
 
