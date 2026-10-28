@@ -399,6 +399,8 @@ func set_action_availability(center_exists: bool, population_full: bool, trainin
 		build_button.disabled = center_exists
 	if train_button != null:
 		train_button.disabled = population_full or training
+	if hauler_button != null:
+		hauler_button.disabled = population_full or training
 	if forester_button != null:
 		forester_button.disabled = forester_limit
 	if charge_button != null:
