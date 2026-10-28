@@ -37,6 +37,15 @@ jobs:
             echo "Godot runtime errors detected in asset showroom."
             exit 1
           fi
+      - name: Test WOW 0.16 production recipe registry and reserved material accounting
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 60s godot --headless --path . --script res://tests/recipe_registry_smoke.gd 2>&1 | tee /tmp/wow-recipes.log
+          grep -F 'RECIPE REGISTRY SMOKE OK' /tmp/wow-recipes.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|RECIPE TEST:' /tmp/wow-recipes.log; then
+            exit 1
+          fi
       - name: Test mine smelter transport and power accounting
         shell: bash
         run: |
