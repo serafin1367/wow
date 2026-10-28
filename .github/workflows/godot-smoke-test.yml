@@ -97,6 +97,16 @@ jobs:
             echo "Build hologram rotation or snapping test failed."
             exit 1
           fi
+      - name: Test build blueprints, technical roads and exact group costs
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/infrastructure_planning_smoke.gd 2>&1 | tee /tmp/wow-infra.log
+          grep -F 'INFRA SMOKE OK' /tmp/wow-infra.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|INFRA TEST:' /tmp/wow-infra.log; then
+            echo "Infrastructure planning or road integration test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
