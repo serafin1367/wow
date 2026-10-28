@@ -70,6 +70,31 @@ func _run() -> void:
 	if loaded.recipe_id != "forge_steel":
 		_fail("Brak bezpiecznego fallback receptury")
 		return
+	# Integracja z pelnym zapisem kolonii (nie tylko lokalnym to_dict).
+	var game = load("res://scenes/main.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	game._spawn_planned_structure({"kind": "workshop", "site": Vector3(22, 0, 22), "quarters": 1})
+	if game.factory_workshop == null:
+		_fail("Glowna scena nie tworzy warsztatu")
+		return
+	game.factory_workshop.deposit_resource("metal", 4)
+	game.factory_workshop.power_enabled = true
+	game.factory_workshop.set_production_target(1)
+	game.factory_workshop._process(5.0)
+	game.set_process(false)
+	game.factory_workshop.set_process(false)
+	var snapshot: Dictionary = game.SAVE_SCRIPT.new().to_dict(game)
+	var restored = load("res://scenes/main.tscn").instantiate()
+	root.add_child(restored)
+	if not game.SAVE_SCRIPT.new().from_dict(restored, snapshot):
+		_fail("Nie odtworzono kolonii z warsztatem")
+		return
+	if restored.factory_workshop == null or restored.factory_workshop.output_buffer.quantity("steel") != 1 or restored.factory_workshop.input_buffer.quantity("metal") != 2:
+		_fail("Odczyt kolonii zgubil materialy warsztatu")
+		return
+	game.queue_free()
+	restored.queue_free()
 	print("WORKSHOP SMOKE OK: power, limits, two recipes, reservations, save/load")
 	workshop.queue_free()
 	loaded.queue_free()
