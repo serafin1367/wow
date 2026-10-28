@@ -1158,11 +1158,11 @@ func _update_factory_power() -> void:
 	if charging_pad.grid_charge_enabled:
 		budget -= charging_pad.REQUIRED_POWER
 	if factory_mine != null:
-		factory_mine.power_enabled = budget + 0.001 >= factory_mine.POWER_KW
+		factory_mine.power_enabled = not factory_mine.production_paused and factory_mine.cycles_remaining != 0 and budget + 0.001 >= factory_mine.POWER_KW
 		if factory_mine.power_enabled:
 			budget -= factory_mine.POWER_KW
 	if factory_smelter != null:
-		factory_smelter.power_enabled = budget + 0.001 >= factory_smelter.POWER_KW
+		factory_smelter.power_enabled = not factory_smelter.production_paused and factory_smelter.cycles_remaining != 0 and budget + 0.001 >= factory_smelter.POWER_KW
 		if factory_smelter.power_enabled:
 			budget -= factory_smelter.POWER_KW
 	for belt in [ore_conveyor, metal_conveyor]:
