@@ -136,9 +136,14 @@ func _make_top_bar() -> void:
 
 	var margin := _margins(18, 11, 18, 11)
 	bar.add_child(margin)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(scroll)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
-	margin.add_child(row)
+	scroll.add_child(row)
 
 	var branding := VBoxContainer.new()
 	branding.custom_minimum_size.x = 150
@@ -195,9 +200,14 @@ func _make_bottom_bar() -> void:
 
 	var margin := _margins(16, 12, 16, 10)
 	bar.add_child(margin)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(scroll)
 	var layout := HBoxContainer.new()
 	layout.add_theme_constant_override("separation", 15)
-	margin.add_child(layout)
+	scroll.add_child(layout)
 
 	# Lewy panel: jednostka / budynek / poziom baterii.
 	var left := VBoxContainer.new()
@@ -366,6 +376,8 @@ func toggle_logistics_panel() -> bool:
 	if logistics_panel == null:
 		return false
 	logistics_panel.visible = not logistics_panel.visible
+	if logistics_panel.visible and production_panel != null:
+		production_panel.visible = false
 	return logistics_panel.visible
 
 
@@ -378,6 +390,8 @@ func toggle_production_panel() -> bool:
 	if production_panel == null:
 		return false
 	production_panel.visible = not production_panel.visible
+	if production_panel.visible and logistics_panel != null:
+		logistics_panel.visible = false
 	return production_panel.visible
 
 
