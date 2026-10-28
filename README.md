@@ -141,14 +141,17 @@ Wczytanie odtwarza jego model w odpowiednim miejscu, bez ponownego
 pobrania rudy z kopalni i bez podwojenia dostawy.
 
 **Architektura:** `scripts/save_game_manager.gd` zapisuje
-wersjonowany plik JSON (`schema_version = 1`). Trwale obiekty maja
+wersjonowany plik JSON (`schema_version = 1`). Szczegolowy kontrakt S1/S2:
+[`docs/SAVE_FORMAT_V1.md`](docs/SAVE_FORMAT_V1.md). Trwale obiekty maja
 `to_dict()` i `from_dict()`, a referencje robotow i maszyn
 odtwarzane sa po stabilnych `save_id` w drugim przebiegu.
 Plik powstaje najpierw jako `.tmp` i jest podmieniany po zapisaniu.
 Nowy format pliku wymaga przyszlych migracji wersji — stare schematy
 sa odrzucane z komunikatem, zamiast byc ladowane czesciowo.
 
-**Test:** `tests/save_load_smoke.gd` sprawdza rzeczywisty plik,
+**Testy:** `tests/save_basics_smoke.gd` sprawdza schemat JSON v1,
+planete, zasoby, budynki i obrot oraz ochrone przed nadpisaniem
+poprawnego slotu. `tests/save_load_smoke.gd` sprawdza rzeczywisty plik,
 tworzenie nowej sceny, pelny bufor huty, pakiet znajdujacy sie na
 tasmie, bilans surowcow, porownanie magazynu i poziomu energii,
 a takze odrzucenie uszkodzonego pliku.
@@ -716,9 +719,9 @@ i sprawdzenia w edytorze Godot na komputerze gracza.
 **[PLAN.md — aktualny plan rozwoju WOW 0.13 → 1.0](PLAN.md)** zawiera priorytety,
 liste zadan, kryteria akceptacji, zaleznosci i testy dla kazdego etapu.
 
-**Najblizszy etap: WOW 0.13 — zapis i odczyt rozgrywki.**
-Pozniej: magazyny posrednie i priorytety logistyki, panel produkcji,
-nowe receptury, energetyka 2.0, rozbudowane tasmociagi i AI robotow.
+**Zrealizowano technicznie WOW 0.13–0.15.** Nastepnym etapem jest
+**WOW 0.16 — receptury i rozszerzona gospodarka**, a po nim energia 2.0,
+tasmociagi 2.0 i AI robotow. Szczegoly w [`PLAN.md`](PLAN.md).
 
 Opisane powyzej wersje 0.2–0.12 to historia zaimplementowanych etapow.
 
@@ -730,4 +733,4 @@ Opisane powyzej wersje 0.2–0.12 to historia zaimplementowanych etapow.
 - Wiertnica, tasmociag i huta sa **wylacznie assetami wizualnymi**.
 - Brak kolizji i wzajemnego omijania poruszajacych sie robotow.
 - Naprawy w prototypie zuzywaja energie robota, ale nie czesci zamienne.
-- Brak zapisu gry i obcego zagrozenia.
+- Zapis gry jest dostepny lokalnie (Ctrl+S / Ctrl+O); nie ma jeszcze obcego zagrozenia.
