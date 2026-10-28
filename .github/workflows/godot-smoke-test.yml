@@ -77,6 +77,16 @@ jobs:
             echo "Grid integration test failed."
             exit 1
           fi
+      - name: Verify building zones and no overlapping structures
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/build_placement_smoke.gd 2>&1 | tee /tmp/wow-building.log
+          grep -F 'PLACEMENT SMOKE OK' /tmp/wow-building.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|PLACEMENT TEST:' /tmp/wow-building.log; then
+            echo "Building occupancy and build preview integration test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
