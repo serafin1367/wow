@@ -6,11 +6,15 @@ const CAPACITY_PER_RESOURCE: int = 120
 const ACCEPTED: Array[String] = ["wood", "stone", "gold", "iron_ore", "metal"]
 
 var cargo = INVENTORY.new("building:depot:buffer")
+var minimum_stock: Dictionary = {}
+var maximum_stock: Dictionary = {}
 
 
 func _init() -> void:
 	for material in ACCEPTED:
 		cargo.configure(material, CAPACITY_PER_RESOURCE)
+		minimum_stock[material] = 0
+		maximum_stock[material] = CAPACITY_PER_RESOURCE
 
 
 func _ready() -> void:
@@ -60,6 +64,30 @@ func _mat(color: Color) -> StandardMaterial3D:
 	return mat
 
 
+func set_stock_limits(resource_type: String, minimum: int, maximum: int) -> bool:
+	if not ACCEPTED.has(resource_type) or minimum < 0 or maximum < minimum or maximum > CAPACITY_PER_RESOURCE:
+		return false
+	minimum_stock[resource_type] = minimum
+	maximum_stock[resource_type] = maximum
+	return true
+
+
+func available_import(resource_type: String) -> int:
+	if not ACCEPTED.has(resource_type):
+		return 0
+	return mini(cargo.available_input(resource_type),
+		maxi(0, int(maximum_stock[resource_type]) - cargo.quantity(resource_type) -
+		cargo._reserved_for(resource_type, true)))
+
+
+func available_export(resource_type: String) -> int:
+	if not ACCEPTED.has(resource_type):
+		return 0
+	return mini(cargo.available_output(resource_type),
+		maxi(0, cargo.quantity(resource_type) - int(minimum_stock[resource_type]) -
+		cargo._reserved_for(resource_type, false)))
+
+
 func get_access_radius() -> float:
 	return CLEARANCE_RADIUS
 
@@ -91,10 +119,15 @@ func describe() -> String:
 func to_dict() -> Dictionary:
 	return {"save_id": str(get_meta("save_id", "")), "position":
 		[global_position.x, global_position.y, global_position.z],
-		"rotation_y": rotation.y, "inventory": cargo.to_dict()}
+		"rotation_y": rotation.y, "inventory": cargo.to_dict(),
+		"minimum_stock": minimum_stock.duplicate(true), "maximum_stock": maximum_stock.duplicate(true)}
 
 
 func from_dict(data: Dictionary) -> void:
 	set_meta("save_id", str(data.get("save_id", "")))
 	if data.has("inventory"):
 		cargo.from_dict(data["inventory"])
+	for key in ACCEPTED:
+		var minimum: int = int(data.get("minimum_stock", {}).get(key, 0))
+		var maximum: int = int(data.get("maximum_stock", {}).get(key, CAPACITY_PER_RESOURCE))
+		set_stock_limits(key, minimum, maximum)
