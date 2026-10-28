@@ -23,6 +23,7 @@ const POWER_CABLE_SCRIPT = preload("res://scripts/power_cable.gd")
 const BUILD_PREVIEW_SCRIPT = preload("res://scripts/build_placement_preview.gd")
 const ROADS_SCRIPT = preload("res://scripts/technical_roads.gd")
 const BLUEPRINTS_SCRIPT = preload("res://scripts/construction_blueprints.gd")
+const LOGISTICS_DEPOT = preload("res://scripts/logistics_depot.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_game_manager.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
@@ -46,6 +47,8 @@ const BATTERY_BANK_COST: Dictionary = {"metal": 12, "stone": 8}
 const MAX_SOLAR_ARRAYS: int = 5
 const MAX_BATTERIES: int = 3
 const MAX_WORKERS: int = 30
+const LOGISTICS_DEPOT_COST: Dictionary = {"wood": 15, "stone": 10}
+const MAX_LOGISTICS_DEPOTS: int = 3
 const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
 
@@ -59,6 +62,8 @@ var drag_start: Vector2 = Vector2.ZERO
 # Paczka startowa statku: materiały wystarczą na pierwszy ekstraktor i hute.
 var resource_totals: Dictionary = {"wood": 90, "gold": 0, "stone": 60, "metal": 0}
 var forester_build_mode: bool = false
+var depot_build_mode: bool = false
+var logistics_depots: Array = []
 var foresters: Array = []
 var build_mode: bool = false
 var town_hall: StaticBody3D
@@ -469,6 +474,8 @@ func _build_cost(kind: String) -> Dictionary:
 			return SOLAR_ARRAY_COST
 		"battery":
 			return BATTERY_BANK_COST
+		"depot":
+			return LOGISTICS_DEPOT_COST
 	return {}
 
 
@@ -664,6 +671,10 @@ func _spawn_planned_structure(entry: Dictionary) -> void:
 			var bank = BATTERY_SCRIPT.new()
 			battery_banks.append(bank)
 			structure = bank
+		"depot":
+			var depot = LOGISTICS_DEPOT.new()
+			logistics_depots.append(depot)
+			structure = depot
 	if structure == null:
 		return
 	structure.position = site
@@ -724,6 +735,8 @@ func _active_build_kind() -> String:
 		return "center"
 	if forester_build_mode:
 		return "forester"
+	if depot_build_mode:
+		return "depot"
 	return ""
 
 
@@ -741,6 +754,8 @@ func _build_radius(kind: String) -> float:
 			return SOLAR_SCRIPT.CLEARANCE_RADIUS
 		"battery":
 			return BATTERY_SCRIPT.CLEARANCE_RADIUS
+		"depot":
+			return LOGISTICS_DEPOT.CLEARANCE_RADIUS
 	return 0.0
 
 
@@ -860,6 +875,8 @@ func _can_place_structure_at(site: Vector3, kind: String, ignore_plan_index: int
 		return false
 	if kind == "battery" and battery_banks.size() + already_planned >= MAX_BATTERIES:
 		return false
+	if kind == "depot" and logistics_depots.size() + already_planned >= MAX_LOGISTICS_DEPOTS:
+		return false
 	# Badamy caly obrys budynku, nie tylko pole pod kursorem.
 	for x in range(floori(site.x - radius), ceili(site.x + radius) + 1):
 		for z in range(floori(site.z - radius), ceili(site.z + radius) + 1):
@@ -882,6 +899,8 @@ func _can_place_structure_at(site: Vector3, kind: String, ignore_plan_index: int
 		reserved.append({"node": solar, "radius": SOLAR_SCRIPT.CLEARANCE_RADIUS})
 	for bank in battery_banks:
 		reserved.append({"node": bank, "radius": BATTERY_SCRIPT.CLEARANCE_RADIUS})
+	for depot in logistics_depots:
+		reserved.append({"node": depot, "radius": LOGISTICS_DEPOT.CLEARANCE_RADIUS})
 	for resource in get_tree().get_nodes_in_group("resource_nodes"):
 		if kind == "mine" and resource == _mine_resource():
 			continue
@@ -933,6 +952,7 @@ func _cancel_build_modes() -> void:
 	_cancel_road_mode()
 	placement_rotation_quarters = 0
 	energy_build_kind = ""
+	depot_build_mode = false
 	_cancel_manual_conveyor()
 	build_mode = false
 	forester_build_mode = false
@@ -1487,6 +1507,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.ctrl_pressed and event.keycode == KEY_O:
 			_load_game()
 			return
+		if event.keycode == KEY_U:
+			_toggle_depot_mode()
+			return
 		if event.keycode == KEY_D:
 			_start_road_mode()
 			return
@@ -1574,7 +1597,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cancel_manual_conveyor()
 			_set_status("Anulowano reczne ukladanie tasmy.")
 			return
-		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode):
+		if event.keycode == KEY_ESCAPE and (build_mode or forester_build_mode or mine_build_mode or smelter_build_mode or depot_build_mode):
 			_cancel_build_modes()
 			_set_status("Anulowano budowe.")
 			return
@@ -1597,6 +1620,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.pressed and _active_build_kind() != "" and (planning_enabled or event.shift_pressed):
 			_queue_building_blueprint(event.position)
+			return
+		if depot_build_mode:
+			if event.pressed:
+				_try_place_depot(event.position)
 			return
 		if energy_build_kind != "":
 			if event.pressed:
@@ -1839,6 +1866,38 @@ func _is_build_site_clear(site: Vector3) -> bool:
 
 func _ground_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
+
+
+func _toggle_depot_mode() -> void:
+	var was_active: bool = depot_build_mode
+	_cancel_build_modes()
+	if was_active:
+		_set_status("Anulowano budowe magazynu posredniego.")
+		return
+	if logistics_depots.size() >= MAX_LOGISTICS_DEPOTS:
+		_set_status("Limit magazynow posrednich: %d." % MAX_LOGISTICS_DEPOTS)
+		return
+	if not _can_afford(LOGISTICS_DEPOT_COST):
+		_set_status("Magazyn wymaga 15 drewna i 10 kamienia.")
+		return
+	depot_build_mode = true
+	_set_status("U: magazyn posredni. LPM postaw, Shift+LPM dodaj do planu, Esc anuluj.")
+
+
+func _try_place_depot(screen_position: Vector2) -> void:
+	var hit: Dictionary = _raycast(screen_position, 1)
+	if hit.is_empty():
+		return
+	var at: Vector3 = _snap_build_point(hit["position"], "depot")
+	if not _can_place_structure_at(at, "depot"):
+		_set_status("Magazyn nie miesci sie: wybierz wolny teren.")
+		return
+	if not _spend_resources(LOGISTICS_DEPOT_COST):
+		return
+	_spawn_planned_structure({"kind": "depot", "site": at, "quarters": placement_rotation_quarters})
+	depot_build_mode = sticky_build_enabled and logistics_depots.size() < MAX_LOGISTICS_DEPOTS and _can_afford(LOGISTICS_DEPOT_COST)
+	_update_action_buttons()
+	_set_status("Magazyn posredni gotowy (120 jednostek na typ surowca).")
 
 
 func _toggle_forester_mode() -> void:
