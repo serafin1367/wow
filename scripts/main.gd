@@ -1438,13 +1438,16 @@ func _tick_logistics(delta: float) -> void:
 			# Wylacz stara trase punkt-punkt po zakonczeniu aktualnej dostawy.
 			var clear_route: Array[Vector3] = []
 			worker.command_move(clear_route)
-	var hub = logistics_depots[0]
-	if metal_conveyor == null:
-		logistics_manager.submit(factory_smelter, hub, "metal", 25, 95)
-	logistics_manager.submit(hub, stockpile, "metal", 25, 110, true)
-	if ore_conveyor == null:
-		logistics_manager.submit(hub, factory_smelter, "iron_ore", 25, 100)
-		logistics_manager.submit(factory_mine, hub, "iron_ore", 25, 85)
+	# Kazdy magazyn jest niezaleznym punktem tranzytowym. Rezerwacje
+	# w tych samych buforach chronia przed podwojnym przydzialem rudy/metalu.
+	for hub in logistics_depots:
+		logistics_manager.submit(hub, stockpile, "metal", 25, 110, true)
+		if ore_conveyor == null:
+			logistics_manager.submit(hub, factory_smelter, "iron_ore", 25, 100)
+		if metal_conveyor == null:
+			logistics_manager.submit(factory_smelter, hub, "metal", 25, 95)
+		if ore_conveyor == null:
+			logistics_manager.submit(factory_mine, hub, "iron_ore", 25, 85)
 	logistics_manager.dispatch(workers, navigation)
 
 
