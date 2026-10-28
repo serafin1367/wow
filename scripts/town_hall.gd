@@ -79,3 +79,12 @@ func _material(color: Color, glowing: bool = false) -> StandardMaterial3D:
 	if glowing:
 		result.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return result
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "position":
+		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
