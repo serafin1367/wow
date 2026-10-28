@@ -14,6 +14,8 @@ const MAX_ORE: int = 80
 const MAX_METAL: int = 40
 
 var power_enabled: bool = false
+var production_paused: bool = false
+var cycles_remaining: int = -1
 var input_buffer = INVENTORY.new("factory:smelter:input")
 var output_buffer = INVENTORY.new("factory:smelter:output")
 var ore_stock: int:
@@ -65,11 +67,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if machine_visual != null:
-		machine_visual.is_working = power_enabled and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL
-	if not power_enabled or ore_stock < ORE_PER_METAL or metal_stock >= MAX_METAL:
+		machine_visual.is_working = power_enabled and not production_paused and cycles_remaining != 0 and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL
+	if not power_enabled or production_paused or cycles_remaining == 0 or ore_stock < ORE_PER_METAL or metal_stock >= MAX_METAL:
 		return
 	accumulated += delta
-	while accumulated >= CYCLE_SECONDS and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL:
+	while accumulated >= CYCLE_SECONDS and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL and cycles_remaining != 0:
 		accumulated -= CYCLE_SECONDS
 		var consumed: int = input_buffer.pull("iron_ore", ORE_PER_METAL)
 		if consumed < ORE_PER_METAL:
@@ -77,7 +79,13 @@ func _process(delta: float) -> void:
 		var produced: int = output_buffer.push("metal", 1)
 		assert(produced == 1, "Smelter output must have space before consuming ore")
 		total_smelted += produced
+		if cycles_remaining > 0:
+			cycles_remaining -= 1
 		stock_changed.emit()
+
+
+func set_production_target(cycles: int) -> void:
+	cycles_remaining = maxi(-1, cycles)
 
 
 func deposit_ore(quantity: int) -> int:
@@ -130,7 +138,8 @@ func to_dict() -> Dictionary:
 		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
 		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated,
 		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict(),
-		"total_smelted": total_smelted}
+		"total_smelted": total_smelted, "production_paused": production_paused,
+		"cycles_remaining": cycles_remaining}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -145,3 +154,5 @@ func from_dict(data: Dictionary) -> void:
 		metal_stock = clampi(int(data.get("metal_stock", 0)), 0, MAX_METAL)
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
 	total_smelted = maxi(0, int(data.get("total_smelted", 0)))
+	production_paused = bool(data.get("production_paused", false))
+	cycles_remaining = maxi(-1, int(data.get("cycles_remaining", -1)))
