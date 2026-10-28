@@ -33,6 +33,10 @@ func _run() -> void:
 	game.factory_mine.stock = 80
 	game.factory_smelter.ore_stock = 10
 	game.factory_smelter.metal_stock = 20
+	# W tym tescie mrozimy generacje i przetop: sprawdzamy wylacznie
+	# bilans transportu. Normalny _process gry co 0.25 s wlacza kopalnie
+	# i hute ponownie, co myliloby transport z nowa produkcja.
+	game.set_process(false)
 	game.factory_mine.power_enabled = false
 	game.factory_smelter.power_enabled = false
 	while game.workers.size() < 20:
@@ -48,6 +52,8 @@ func _run() -> void:
 	# Fizyczny ruch, planowanie i przekazywanie ladunkow przez 5 sekund.
 	for frame in range(300):
 		await physics_frame
+		if frame % 30 == 0:
+			game._tick_logistics(0.9)
 		if frame % 60 == 0 and _balance(game) != original:
 			_fail("Zmienil sie bilans przy ruchu 20 robotow (klatka %d)" % frame)
 			return
