@@ -67,6 +67,16 @@ jobs:
             echo "Manual conveyor geometry / route test failed."
             exit 1
           fi
+      - name: Test solar plant, battery storage, spark visuals and cables
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/power_grid_smoke.gd 2>&1 | tee /tmp/wow-grid.log
+          grep -F 'POWER GRID SMOKE OK' /tmp/wow-grid.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|POWER TEST:' /tmp/wow-grid.log; then
+            echo "Grid integration test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
