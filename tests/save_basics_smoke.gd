@@ -14,20 +14,24 @@ func _fail(message: String) -> void:
 	quit(1)
 
 
-func _is_json_data(value: Variant) -> bool:
+func _invalid_json_path(value: Variant, at: String = "root") -> String:
 	if value == null or value is String or value is bool or value is int or value is float:
-		return true
+		return ""
 	if value is Array:
-		for item in value:
-			if not _is_json_data(item):
-				return false
-		return true
+		for i in range(value.size()):
+			var invalid: String = _invalid_json_path(value[i], "%s[%d]" % [at, i])
+			if not invalid.is_empty():
+				return invalid
+		return ""
 	if value is Dictionary:
 		for key in value.keys():
-			if not (key is String) or not _is_json_data(value[key]):
-				return false
-		return true
-	return false
+			if not (key is String):
+				return "%s: unexpected key type %s" % [at, type_string(typeof(key))]
+			var invalid: String = _invalid_json_path(value[key], "%s.%s" % [at, str(key)])
+			if not invalid.is_empty():
+				return invalid
+		return ""
+	return "%s: unexpected value type %s" % [at, type_string(typeof(value))]
 
 
 func _test() -> void:
@@ -52,8 +56,9 @@ func _test() -> void:
 	if int(snapshot.get("schema_version", -1)) != 1 or not manager.validate(snapshot):
 		_fail("Niepoprawny schemat JSON v1")
 		return
-	if not _is_json_data(snapshot):
-		_fail("Snapshot zawiera Node, Vector3 lub inny obiekt niezgodny z JSON")
+	var bad_path: String = _invalid_json_path(snapshot)
+	if not bad_path.is_empty():
+		_fail("Snapshot nie jest zgodny z JSON: " + bad_path)
 		return
 	var record: Dictionary = {}
 	for building in snapshot["structures"]:
