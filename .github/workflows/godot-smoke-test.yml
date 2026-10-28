@@ -107,6 +107,16 @@ jobs:
             echo "Infrastructure planning or road integration test failed."
             exit 1
           fi
+      - name: Test versioned save load and in-flight cargo conservation
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/save_load_smoke.gd 2>&1 | tee /tmp/wow-save-load.log
+          grep -F 'SAVE LOAD SMOKE OK' /tmp/wow-save-load.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|SAVE TEST:' /tmp/wow-save-load.log; then
+            echo "Save/load integration test failed."
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
