@@ -5,6 +5,9 @@ const LANDER_SCRIPT = preload("res://scripts/colony_lander.gd")
 const CHARGER_SCRIPT = preload("res://scripts/charging_pad.gd")
 const FACTORY_SCRIPT = preload("res://scripts/factory_models.gd")
 const KENNEY_ASSETS = preload("res://scripts/kenney_assets.gd")
+const SOLAR = preload("res://scripts/solar_array.gd")
+const BATTERY = preload("res://scripts/battery_bank.gd")
+const GRID_CABLE = preload("res://scripts/power_cable.gd")
 
 
 func _ready() -> void:
@@ -71,11 +74,39 @@ func _ready() -> void:
 			add_child(nature)
 			_label(nature_names[i].to_upper(), nature.position + Vector3(0, 5.4, 0))
 
+	# WOW 0.9: fotowoltaika i akumulatory do obejrzenia z bliska.
+	var panel = SOLAR.new()
+	panel.position = Vector3(19, 0, -3)
+	add_child(panel)
+	_label("SOLAR 4 kW", panel.position + Vector3(0, 6.0, 0))
+	var bank = BATTERY.new()
+	bank.position = Vector3(19, 0, 5)
+	bank.stored_kwh = 4.0
+	add_child(bank)
+	_label("BATTERY 8 kWh", bank.position + Vector3(0, 4.2, 0))
+
+	var cable = GRID_CABLE.new()
+	cable.setup(panel.position, bank.position)
+	add_child(cable)
+
+	var extractor = FACTORY_SCRIPT.new()
+	extractor.machine_type = "extractor"
+	extractor.is_working = true
+	extractor.position = Vector3(-21, 0, 7)
+	add_child(extractor)
+	_label("DRILL - MOVING", extractor.position + Vector3(0, 5.1, 0))
+	var furnace = FACTORY_SCRIPT.new()
+	furnace.machine_type = "smelter"
+	furnace.is_working = true
+	furnace.position = Vector3(-21, 0, 17)
+	add_child(furnace)
+	_label("FURNACE - SPARKS", furnace.position + Vector3(0, 7.0, 0))
+
 	var camera := Camera3D.new()
-	camera.position = Vector3(-4, 37, 60)
+	camera.position = Vector3(-2, 39, 65)
 	camera.fov = 65.0
 	add_child(camera)
-	camera.look_at(Vector3(-4, 4, 4), Vector3.UP)
+	camera.look_at(Vector3(0, 4, 6), Vector3.UP)
 	camera.current = true
 
 
