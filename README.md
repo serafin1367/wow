@@ -4,6 +4,67 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.12 — drogi techniczne, projekty kolonii i budowa seryjna
+
+### Przejezdne drogi techniczne — D
+
+Po nacisnieciu **D** gracz przechodzi w tryb rysowania drogi:
+1. **LPM** wybiera jej poczatek. Przesun mysz, aby obejrzec trase A*.
+2. Kolejny **LPM** dodaje punkt posredni/zakret; mozna wskazac do 12 punktow.
+3. **Enter** buduje wszystkie nowe fragmenty. **Backspace** cofa ostatni
+   punkt, **Esc/PPM** anuluje bez pobrania materialow.
+
+Koszt: **1 kamien za kazde rozpoczęte 4 NOWE pola drogi**. Stare
+segmenty mozna wykorzystac ponownie za darmo. Droga nie posiada kolizji
+i prowadzi roboty po dotychczasowej siatce A*, bez zmiany ich tras.
+Na wybrukowanym terenie roboty poruszaja sie **o 25% szybciej**.
+Pojedynczy projekt drogi moze miec do 160 pol. Drogi nie wchodza na
+zablokowane pola i rezerwuja swoj obszar przed nowymi budynkami.
+
+### Plan grupy budynkow — F / Shift+LPM
+
+- **F** wlacza i wylacza tryb **PLANOWANIA**. Kiedy F jest aktywne,
+  LPM dodaje polprzezroczysty hologram wybranego budynku do projektu
+  (nie buduje go od razu).
+- Niezaleznie od F, mozna dodac pojedynczy budynek do projektu przez
+  **Shift+LPM** w trybie budowania.
+- Zmieniaj typy budynkow (M kopalnia, H huta, B centrum, L rekultywacja,
+  V panel, K bateria), orientacje R i siatke G; plan zostaje na mapie.
+- **Enter** zatwierdza caly projekt i pobiera zsumowane koszty *raz*,
+  dopiero gdy wszystkie elementy nadal sa dozwolone i wystarcza surowcow.
+- **Backspace** usuwa ostatni zaplanowany element; **Delete** kasuje
+  caly projekt bez kosztow. Esc anuluje aktualny tryb budowania,
+  ale nie kasuje zapisanych hologramow (uzyj Delete).
+- Maksymalnie 12 konstrukcji w jednym projekcie. Weryfikacja blokuje
+  nakladanie projektow na budynki, zloza i drogi, pilnuje limitow
+  poszczegolnych typow.
+
+**Prosty lancuch produkcyjny:** F -> M -> LPM na zlozu zelaza ->
+H -> LPM na wolnym terenie -> Enter. Kopalnia i huta powstaja
+razem, a transportowiec otrzymuje zwykle zadanie dostaw. Pozniej
+mozna ukladac drogi D i automatyczne tasmy J/N (te ostatnie
+wymagaja metalu wyprodukowanego przez hute). Planowanie tasmociagow
+**nie jest jeszcze czescia transakcji zbiorczej**.
+
+### Budowa seryjna — X
+
+**X** przelacza tryb SERIA. Dla powtarzalnych konstrukcji
+(rekultywacja **L**, panel PV **V**, akumulator **K**) po udanym
+LPM pozostajesz w trybie budowania i mozesz postawic nastepny
+egzemplarz bez ponownego wybierania przycisku.
+Seria zatrzymuje sie po wyczerpaniu surowcow lub limitu budynkow;
+Esc/PPM konczy tryb. Pojedyncze centrum, kopalnia i huta pozostaja
+jednorazowymi konstrukcjami.
+
+Kod: `scripts/technical_roads.gd`,
+`scripts/construction_blueprints.gd`, `scripts/main.gd`
+i `scripts/worker.gd`. Weryfikacja:
+`tests/infrastructure_planning_smoke.gd` na GitHub Actions.
+
+Po `git pull origin main`: najpierw sprawdz D i budowe drogi,
+a nastepnie F -> M -> klik na zelazo -> H -> klik na wolne pole
+-> Enter. Sprawdz tez, czy Delete usuwa hologramy i zachowuje zasoby.
+
 ## WOW 0.11 — hologram modelu 3D, obroty i modularna siatka budowy
 
 Po wybraniu konstrukcji (B centrum, L rekultywacja, M kopalnia,
