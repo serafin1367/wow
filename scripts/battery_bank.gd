@@ -103,3 +103,15 @@ func _mat(color: Color, glow: bool = false) -> StandardMaterial3D:
 	if glow:
 		result.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return result
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "position":
+		[global_position.x, global_position.y, global_position.z],
+		"rotation_y": rotation.y, "stored_kwh": stored_kwh, "active_flow": active_flow}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	stored_kwh = clampf(float(data.get("stored_kwh", 0.0)), 0.0, CAPACITY_KWH)
+	active_flow = float(data.get("active_flow", 0.0))
