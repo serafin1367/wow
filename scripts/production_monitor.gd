@@ -42,7 +42,11 @@ func report(mine, smelter) -> Dictionary:
 	var smelter_progress: float = 0.0
 	if is_instance_valid(mine):
 		mine_progress = 100.0 * clampf(mine.accumulated / mine.CYCLE_SECONDS, 0.0, 1.0)
-		if not mine.power_enabled:
+		if mine.production_paused:
+			mine_status = "WSTRZYMANA"
+		elif mine.cycles_remaining == 0:
+			mine_status = "ZLECENIE WYKONANE"
+		elif not mine.power_enabled:
 			mine_status = "BRAK ENERGII"
 		elif mine.stock >= mine.MAX_BUFFER:
 			mine_status = "PELNY BUF RUDY"
@@ -52,7 +56,11 @@ func report(mine, smelter) -> Dictionary:
 			mine_status = "PRACUJE"
 	if is_instance_valid(smelter):
 		smelter_progress = 100.0 * clampf(smelter.accumulated / smelter.CYCLE_SECONDS, 0.0, 1.0)
-		if not smelter.power_enabled:
+		if smelter.production_paused:
+			smelter_status = "WSTRZYMANA"
+		elif smelter.cycles_remaining == 0:
+			smelter_status = "ZLECENIE WYKONANE"
+		elif not smelter.power_enabled:
 			smelter_status = "BRAK ENERGII"
 		elif smelter.metal_stock >= smelter.MAX_METAL:
 			smelter_status = "PELNY BUF METALU"
@@ -61,6 +69,7 @@ func report(mine, smelter) -> Dictionary:
 		else:
 			smelter_status = "PRACUJE"
 	return {"ore_per_min": ore_rate, "metal_per_min": metal_rate,
+		"ore_consumed_per_min": metal_rate * 2.0,
 		"mine_status": mine_status, "smelter_status": smelter_status,
 		"mine_progress": mine_progress, "smelter_progress": smelter_progress,
 		"ore_created": last_ore, "metal_created": last_metal}
