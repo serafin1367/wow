@@ -9,11 +9,13 @@ var inputs: Dictionary = {}
 var outputs: Dictionary = {}
 var duration_seconds: float = 0.0
 var power_kw: float = 0.0
+var requires_external_source: bool = false
 
 
 func _init(id: String = "", kind: String = "", title: String = "",
 		consumes: Dictionary = {}, produces: Dictionary = {},
-		seconds: float = 0.0, kilowatts: float = 0.0) -> void:
+		seconds: float = 0.0, kilowatts: float = 0.0,
+		external_source: bool = false) -> void:
 	recipe_id = id
 	machine_kind = kind
 	display_name = title
@@ -21,6 +23,7 @@ func _init(id: String = "", kind: String = "", title: String = "",
 	outputs = produces.duplicate(true)
 	duration_seconds = seconds
 	power_kw = kilowatts
+	requires_external_source = external_source
 
 
 func is_valid() -> bool:
@@ -48,7 +51,9 @@ func output_amount(resource_type: String) -> int:
 
 
 func can_process(input_port, output_port) -> bool:
-	if not is_valid() or output_port == null:
+	if not is_valid() or output_port == null or requires_external_source:
+		# Zloza musza byc pobierane przez harvest() i sa skonczone.
+		# Sama definicja kopalni nie moze tworzyc rudy z niczego.
 		return false
 	if not inputs.is_empty() and input_port == null:
 		return false
@@ -85,29 +90,39 @@ func to_dict() -> Dictionary:
 		"inputs": inputs.duplicate(true),
 		"outputs": outputs.duplicate(true),
 		"duration_seconds": duration_seconds,
-		"power_kw": power_kw
+		"power_kw": power_kw,
+		"requires_external_source": requires_external_source
 	}
 
 
+static func _parse_amounts(raw: Variant) -> Variant:
+	if not (raw is Dictionary):
+		return null
+	var parsed: Dictionary = {}
+	for key in raw.keys():
+		if not (key is String) or str(key).is_empty():
+			return null
+		var quantity: Variant = raw[key]
+		if not (quantity is int or quantity is float):
+			return null
+		var amount: float = float(quantity)
+		if not is_finite(amount) or amount <= 0.0 or amount > 1000000.0 or amount != float(int(amount)):
+			return null
+		parsed[str(key)] = int(amount)
+	return parsed
+
+
 static func from_dict(data: Dictionary):
-	# JSON.parse() moze odtwarzac liczby jako float; ilosci surowcow
-	# musza byc calkowite, nie dopuszczamy zaokraglania ulamkow.
-	var raw_inputs: Dictionary = data.get("inputs", {})
-	var raw_outputs: Dictionary = data.get("outputs", {})
-	var consumes: Dictionary = {}
-	var produces: Dictionary = {}
-	for source in [raw_inputs, raw_outputs]:
-		var result: Dictionary = consumes if source == raw_inputs else produces
-		for material in source:
-			var qty: Variant = source[material]
-			if not (qty is int or qty is float) or float(qty) <= 0.0:
-				return null
-			if float(qty) != float(int(qty)):
-				return null
-			result[str(material)] = int(qty)
+	# Niejawne rzutowanie JSON float/int nie moze zmieniac
+	# ilosci zasobow. Akceptujemy jedynie dodatnie liczby calkowite.
+	var consumes: Variant = _parse_amounts(data.get("inputs", null))
+	var produces: Variant = _parse_amounts(data.get("outputs", null))
+	if consumes == null or produces == null:
+		return null
 	var result_recipe = load("res://scripts/production_recipe.gd").new(
 		str(data.get("recipe_id", "")), str(data.get("machine_kind", "")),
 		str(data.get("display_name", "")), consumes, produces,
 		float(data.get("duration_seconds", 0.0)),
-		float(data.get("power_kw", -1.0)))
+		float(data.get("power_kw", -1.0)),
+		bool(data.get("requires_external_source", false)))
 	return result_recipe if result_recipe.is_valid() else null
