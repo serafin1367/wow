@@ -4,6 +4,7 @@ signal close_requested
 signal refresh_requested
 signal pause_requested(kind: String)
 signal queue_requested(kind: String, cycles: int)
+signal priority_requested(kind: String, priority: int)
 signal focus_requested(kind: String)
 
 const BG_COLOR: Color = Color(0.055, 0.11, 0.15, 0.98)
@@ -168,6 +169,24 @@ func _add_machine(machine: Dictionary) -> void:
 	apply.text = "USTAW"
 	apply.pressed.connect(_send_queue.bind(kind, remaining))
 	controls.add_child(apply)
+	var priority_row := HBoxContainer.new()
+	block.add_child(priority_row)
+	priority_row.add_child(_label("Priorytet zasilania:", 11))
+	var priority := SpinBox.new()
+	priority.min_value = 0
+	priority.max_value = 200
+	priority.step = 1
+	priority.value = int(machine.get("priority", 100))
+	priority.custom_minimum_size.x = 84
+	priority_row.add_child(priority)
+	var priority_button := Button.new()
+	priority_button.text = "USTAW"
+	priority_button.pressed.connect(_send_priority.bind(kind, priority))
+	priority_row.add_child(priority_button)
+
+
+func _send_priority(kind: String, editor: SpinBox) -> void:
+	priority_requested.emit(kind, int(editor.value))
 
 
 func _send_pause(kind: String) -> void:
