@@ -4,6 +4,25 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.15 — wskazniki produkcji (pierwszy krok)
+
+Wersja rozwojowa 0.15 dodaje statystyki niezalezne od magazynu:
+kopalnia i huta maja **trwale liczniki** wyprodukowanego materialu.
+Dzieki temu pobranie rudy przez robota nie zmniejsza wskaznika
+produkcji. `scripts/production_monitor.gd` zbiera probki co 2 s,
+przechowuje ostatnich 30 probek (do 60 s) i liczy produkcje/min.
+
+Na gornej belce widoczne sa **RUDA/min** i **METAL/min**.
+Kliknij kopalnie lub hute, aby zobaczyc recepture, we/wy,
+stan buforow, zapotrzebowanie na moc, postep cyklu i komunikat
+o problemie (brak energii, rudy/zloza, pelny bufor).
+`Ctrl+S` / `Ctrl+O` zachowuje wskazania i liczniki produkcji.
+
+Test jednostkowy `tests/production_monitor_smoke.gd` sprawdza tempo,
+niezaleznosc od transportu, diagnoze przestojow i zapis licznika.
+Pelny widok zuzycia/min, kolejki receptur, alarmy z przejsciem
+do maszyny i przyciski pauzy sa planowane w dalszej czesci 0.15.
+
 ## WOW 0.14 — zarzadzanie logistyka i magazynami posrednimi
 
 **Budowa:** `U` otwiera projekt magazynu posredniego, cena **15 drewna +
