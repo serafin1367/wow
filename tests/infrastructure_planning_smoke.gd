@@ -109,7 +109,7 @@ func _run_test() -> void:
 		return
 	var stone_before: int = int(game.resource_totals["stone"])
 	game.road_mode = true
-	game.road_preview_route = path
+	game.road_preview_route = path.duplicate()
 	game.roads.preview(path)
 	if game.roads.built_cells.size() != 0 or int(game.resource_totals["stone"]) != stone_before:
 		_fail("Podglad drogi pobiera materialy przed budowa")
