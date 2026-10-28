@@ -11,6 +11,8 @@ signal mine_requested
 signal smelter_requested
 signal ore_conveyor_requested
 signal metal_conveyor_requested
+signal solar_array_requested
+signal battery_bank_requested
 
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
@@ -38,6 +40,9 @@ var smelter_button: Button
 var ore_belt_button: Button
 var metal_belt_button: Button
 var balance_label: Label
+var storage_label: Label
+var solar_button: Button
+var battery_button: Button
 
 
 func _ready() -> void:
@@ -85,7 +90,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.8", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.9", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -110,6 +115,8 @@ func _make_top_bar() -> void:
 	power_block.add_child(energy_label)
 	balance_label = _label("REZERWA: 0.0 kW", 11, MUTED)
 	power_block.add_child(balance_label)
+	storage_label = _label("AKUMULACJA: 0.0 kWh", 11, MUTED)
+	power_block.add_child(storage_label)
 	row.add_child(power_block)
 
 
@@ -122,7 +129,7 @@ func _make_bottom_bar() -> void:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 14
 	bar.offset_right = -14
-	bar.offset_top = -188
+	bar.offset_top = -244
 	bar.offset_bottom = -14
 
 	var margin := _margins(16, 12, 16, 10)
@@ -197,6 +204,18 @@ func _make_bottom_bar() -> void:
 	metal_belt_button.pressed.connect(func(): metal_conveyor_requested.emit())
 	factory_actions.add_child(metal_belt_button)
 
+	var energy_actions := HBoxContainer.new()
+	energy_actions.add_theme_constant_override("separation", 8)
+	center.add_child(energy_actions)
+	solar_button = _action_button("V   SOLAR +4 kW", "8 metalu + 5 kamienia. Ustaw na wolnym terenie.", ORANGE)
+	solar_button.custom_minimum_size.y = 32
+	solar_button.pressed.connect(func(): solar_array_requested.emit())
+	energy_actions.add_child(solar_button)
+	battery_button = _action_button("K   AKUMULATOR 8 kWh", "12 metalu + 8 kamienia. Magazyn nadwyzki z PV.", TURQUOISE)
+	battery_button.custom_minimum_size.y = 32
+	battery_button.pressed.connect(func(): battery_bank_requested.emit())
+	energy_actions.add_child(battery_button)
+
 	event_label = _label("Gotowosc systemow kolonii.", 13, TEXT)
 	event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	event_label.clip_text = true
@@ -251,6 +270,18 @@ func set_conveyor_availability(ore_built: bool, metal_built: bool, machines_read
 		ore_belt_button.disabled = ore_built or not machines_ready
 	if metal_belt_button != null:
 		metal_belt_button.disabled = metal_built or not machines_ready
+
+
+func set_energy_storage(current_kwh: float, max_kwh: float, solar_kw: float) -> void:
+	if storage_label != null:
+		storage_label.text = "PV: %.1f kW | BATERIE: %.2f/%.0f kWh" % [solar_kw, current_kwh, max_kwh]
+
+
+func set_energy_build_availability(solar_count: int, solar_limit: int, battery_count: int, battery_limit: int) -> void:
+	if solar_button != null:
+		solar_button.disabled = solar_count >= solar_limit
+	if battery_button != null:
+		battery_button.disabled = battery_count >= battery_limit
 
 
 func set_status(message: String) -> void:
