@@ -4,10 +4,14 @@ extends RefCounted
 ## Persisted data contains stable IDs, no serialized scene nodes.
 
 const MAX_JOBS: int = 16
+const MAX_ROUTE_FAILURES: int = 3
+const LANE_COOLDOWN_TICKS: int = 16
 var next_number: int = 1
 var jobs: Array[Dictionary] = []
 var sources: Dictionary = {}
 var destinations: Dictionary = {}
+var priority_overrides: Dictionary = {}
+var lane_cooldowns: Dictionary = {}
 
 
 func _node_id(node: Node) -> String:
@@ -20,6 +24,19 @@ func _source_port(node, resource_type: String):
 
 func _destination_port(node, resource_type: String):
 	return node.get_input_port(resource_type) if is_instance_valid(node) and node.has_method("get_input_port") else null
+
+
+func _lane_key(source_id: String, destination_id: String, resource_type: String) -> String:
+	return source_id + "|" + destination_id + "|" + resource_type
+
+
+func _tick_cooldowns() -> void:
+	for key in lane_cooldowns.keys():
+		var ticks: int = int(lane_cooldowns[key]) - 1
+		if ticks <= 0:
+			lane_cooldowns.erase(key)
+		else:
+			lane_cooldowns[key] = ticks
 
 
 func has_lane(from_node, to_node, resource_type: String) -> bool:
@@ -35,6 +52,9 @@ func submit(from_node, to_node, resource_type: String, amount: int, priority: in
 	var source_id: String = _node_id(from_node)
 	var dest_id: String = _node_id(to_node)
 	if source_id.is_empty() or dest_id.is_empty() or has_lane(from_node, to_node, resource_type):
+		return ""
+	var lane: String = _lane_key(source_id, dest_id, resource_type)
+	if int(lane_cooldowns.get(lane, 0)) > 0:
 		return ""
 	var source_port = _source_port(from_node, resource_type)
 	var destination_port = _destination_port(to_node, resource_type)
@@ -57,8 +77,9 @@ func submit(from_node, to_node, resource_type: String, amount: int, priority: in
 		return ""
 	next_number += 1
 	jobs.append({"id": id, "source_id": source_id, "destination_id": dest_id,
-		"resource_type": resource_type, "amount": count, "priority": priority,
-		"status": "queued", "worker_id": "", "sink": sink})
+		"resource_type": resource_type, "amount": count,
+		"priority": int(priority_overrides.get(lane, priority)),
+		"status": "queued", "worker_id": "", "sink": sink, "route_failures": 0})
 	sources[id] = from_node
 	destinations[id] = to_node
 	return id
@@ -72,6 +93,7 @@ func get_job(job_id: String) -> Dictionary:
 
 
 func dispatch(workers: Array, navigation: RefCounted) -> void:
+	_tick_cooldowns()
 	var sorted: Array[Dictionary] = jobs.duplicate()
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a["priority"]) > int(b["priority"]))
@@ -90,6 +112,13 @@ func dispatch(workers: Array, navigation: RefCounted) -> void:
 			if worker.command_logistics_job(job, source, destination, self, navigation):
 				job["worker_id"] = _node_id(worker)
 				job["status"] = "assigned"
+				job["route_failures"] = 0
+				break
+			job["route_failures"] = int(job.get("route_failures", 0)) + 1
+			if int(job["route_failures"]) >= MAX_ROUTE_FAILURES:
+				var lane: String = _lane_key(job["source_id"], job["destination_id"], job["resource_type"])
+				lane_cooldowns[lane] = LANE_COOLDOWN_TICKS
+				finish(job["id"])
 				break
 
 
@@ -104,6 +133,7 @@ func set_priority(job_id: String, priority: int) -> bool:
 	if job.is_empty():
 		return false
 	job["priority"] = clampi(priority, 0, 200)
+	priority_overrides[_lane_key(job["source_id"], job["destination_id"], job["resource_type"])] = int(job["priority"])
 	return true
 
 
@@ -149,7 +179,9 @@ func finish(job_id: String) -> void:
 
 func to_dict() -> Dictionary:
 	return {"save_id": "logistics:manager", "type_id": "service:logistics",
-		"object_version": 1, "next_number": next_number, "jobs": jobs.duplicate(true)}
+		"object_version": 1, "next_number": next_number, "jobs": jobs.duplicate(true),
+		"priority_overrides": priority_overrides.duplicate(true),
+		"lane_cooldowns": lane_cooldowns.duplicate(true)}
 
 
 func from_dict(data: Dictionary, lookup: Dictionary) -> void:
@@ -157,6 +189,8 @@ func from_dict(data: Dictionary, lookup: Dictionary) -> void:
 	sources.clear()
 	destinations.clear()
 	next_number = maxi(1, int(data.get("next_number", 1)))
+	priority_overrides = data.get("priority_overrides", {}).duplicate(true)
+	lane_cooldowns = data.get("lane_cooldowns", {}).duplicate(true)
 	for raw in data.get("jobs", []):
 		if not (raw is Dictionary):
 			continue
