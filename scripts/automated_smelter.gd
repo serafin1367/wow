@@ -176,12 +176,12 @@ func get_access_radius() -> float:
 
 func describe() -> String:
 	var status := "PRZETAPIANIE" if power_enabled else "BRAK ENERGII"
-	if power_enabled and ore_stock < ORE_PER_METAL:
+	if power_enabled and ore_stock < active_recipe.input_amount("iron_ore"):
 		status = "OCZEKIWANIE NA RUDE"
 	elif metal_stock >= MAX_METAL:
 		status = "MAGAZYN PELNY"
 	return "%s | Ruda: %d/%d | Metal: %d/%d | %.1f kW" % [
-		status, ore_stock, MAX_ORE, metal_stock, MAX_METAL, POWER_KW
+		status, ore_stock, MAX_ORE, metal_stock, MAX_METAL, active_recipe.power_kw
 	]
 
 
