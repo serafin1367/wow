@@ -154,6 +154,24 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|MULTIDEPOT TEST:' /tmp/wow-multi-depot.log; then
             exit 1
           fi
+      - name: Test logistics panel commands and persisted stock limits
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path . --script res://tests/logistics_panel_smoke.gd 2>&1 | tee /tmp/wow-logistics-ui.log
+          grep -F 'LOGISTICS PANEL SMOKE OK' /tmp/wow-logistics-ui.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|LOGISTICS UI TEST:' /tmp/wow-logistics-ui.log; then
+            exit 1
+          fi
+      - name: Test unreachable logistics route retries and rollbacks
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path . --script res://tests/logistics_recovery_smoke.gd 2>&1 | tee /tmp/wow-logistics-recovery.log
+          grep -F 'LOGISTICS RECOVERY SMOKE OK' /tmp/wow-logistics-recovery.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|RECOVERY TEST:' /tmp/wow-logistics-recovery.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
