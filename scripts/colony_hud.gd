@@ -18,6 +18,8 @@ signal planning_requested
 signal sticky_requested
 signal commit_plan_requested
 signal clear_plan_requested
+signal save_requested
+signal load_requested
 
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
@@ -99,7 +101,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.12", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.13", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -253,6 +255,16 @@ func _make_bottom_bar() -> void:
 	clear_plan.tooltip_text = "Usun niezrealizowane hologramy"
 	clear_plan.pressed.connect(func(): clear_plan_requested.emit())
 	plan_row.add_child(clear_plan)
+	var save_action := Button.new()
+	save_action.text = "ZAPISZ"
+	save_action.tooltip_text = "Ctrl+S: zapisz caly stan kolonii"
+	save_action.pressed.connect(func(): save_requested.emit())
+	plan_row.add_child(save_action)
+	var load_action := Button.new()
+	load_action.text = "WCZYTAJ"
+	load_action.tooltip_text = "Ctrl+O: wczytaj ostatni zapis i zastap biezaca gre"
+	load_action.pressed.connect(func(): load_requested.emit())
+	plan_row.add_child(load_action)
 
 	event_label = _label("Gotowosc systemow kolonii.", 13, TEXT)
 	event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -273,6 +285,7 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("G   Siatka 1/2/4 m", 12, TEXT))
 	help.add_child(_label("D   Droga | F   Plan", 12, TURQUOISE))
 	help.add_child(_label("X   Budowa seryjna", 12, TEXT))
+	help.add_child(_label("Ctrl+S / Ctrl+O   Zapis / odczyt", 11, TURQUOISE))
 	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
 	help.add_child(_label("ENTER   Zbuduj trase", 12, TEXT))
 	help.add_child(_label("ESC   Anuluj budowe", 12, TEXT))
