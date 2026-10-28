@@ -130,7 +130,10 @@ func _run_test() -> void:
 	if fresh.ore_conveyor.packets.is_empty() or int(fresh.ore_conveyor.packets[0]["amount"]) != pending:
 		_fail("Paczka zniknela podczas oczekiwania przed pelnym buforem")
 		return
+	# Symulacja przetopienia zwalnia miejsce bez niszczenia masy:
+	# 2 jednostki rudy zamieniamy na 1 sztabke metalu.
 	fresh.factory_smelter.ore_stock -= pending
+	fresh.factory_smelter.metal_stock += pending / 2
 	fresh.ore_conveyor._process(0.1)
 	if int(fresh.ore_conveyor.total_transferred) < pending:
 		_fail("Paczka nie wznowila dostawy po zwolnieniu bufora")
@@ -161,7 +164,7 @@ func _run_test() -> void:
 
 
 func _ore_balance(game) -> int:
-	var total: int = int(game.factory_mine.stock) + int(game.factory_smelter.ore_stock)
+	var total: int = int(game.factory_mine.stock) + int(game.factory_smelter.ore_stock) + int(game.factory_smelter.metal_stock) * 2
 	for parcel in game.ore_conveyor.packets:
 		total += int(parcel["amount"])
 	return total
