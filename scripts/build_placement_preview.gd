@@ -4,6 +4,7 @@ extends Node3D
 ## Kolor obrysu odpowiada faktycznej walidacji calego budynku.
 
 const GRID_RADIUS: int = 8
+const GHOST_SCRIPT = preload("res://scripts/building_ghost.gd")
 const FREE_COLOR: Color = Color(0.12, 0.88, 0.48, 0.31)
 const BLOCKED_COLOR: Color = Color(0.97, 0.18, 0.16, 0.39)
 
@@ -12,6 +13,7 @@ var blocked_mesh: MultiMeshInstance3D
 var footprint: MeshInstance3D
 var hover_caption: Label3D
 var last_radius: float = -1.0
+var ghost = null
 
 
 func _ready() -> void:
@@ -32,6 +34,10 @@ func _ready() -> void:
 	hover_caption.position.y = 2.3
 	hover_caption.no_depth_test = true
 	add_child(hover_caption)
+
+	ghost = GHOST_SCRIPT.new()
+	add_child(ghost)
+	ghost.clear()
 	visible = false
 
 
@@ -60,7 +66,7 @@ func _material(color: Color) -> StandardMaterial3D:
 	return mat
 
 
-func update_area(site: Vector3, radius: float, can_build: bool, free_cell: Callable) -> void:
+func update_area(site: Vector3, radius: float, can_build: bool, free_cell: Callable, kind: String = "", rotation_quarters: int = 0, snap_size: int = 1) -> void:
 	visible = true
 	position = Vector3(roundf(site.x), 0.0, roundf(site.z))
 	if absf(radius - last_radius) > 0.01:
@@ -75,6 +81,11 @@ func update_area(site: Vector3, radius: float, can_build: bool, free_cell: Calla
 		Color(0.18, 1.0, 0.45, 0.96) if can_build else Color(1.0, 0.20, 0.13, 0.96)
 	)
 	hover_caption.text = "WOLNE MIEJSCE" if can_build else "ZAJETE / NIEDOSTEPNE"
+	if kind != "":
+		hover_caption.text += "  |  R: %d°  G: %dm" % [posmod(rotation_quarters, 4) * 90, snap_size]
+		ghost.show_building(kind, rotation_quarters, can_build)
+	else:
+		ghost.clear()
 	hover_caption.modulate = Color(0.30, 1.0, 0.52) if can_build else Color(1.0, 0.39, 0.31)
 
 	var available: Array[Vector3] = []
@@ -104,3 +115,5 @@ func _fill_instances(multimesh: MultiMesh, places: Array[Vector3]) -> void:
 
 func clear() -> void:
 	visible = false
+	if ghost != null and ghost.visible:
+		ghost.clear()
