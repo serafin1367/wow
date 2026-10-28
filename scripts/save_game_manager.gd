@@ -4,6 +4,7 @@ extends RefCounted
 
 const SCHEMA_VERSION: int = 1
 const SAVE_PATH: String = "user://wow-save-1.json"
+const MAX_SAVE_BYTES: int = 16 * 1024 * 1024
 const RESOURCE_NAMES: Array[String] = ["GoldMine", "StoneQuarry", "IronOreDeposit"]
 
 
@@ -178,6 +179,11 @@ func validate(data: Variant) -> bool:
 
 func save_file(game: Node3D, path: String = SAVE_PATH) -> bool:
 	var data: Dictionary = to_dict(game)
+	# Nie nadpisuj poprawnego slotu, jesli serializacja wygenerowala
+	# niekompletny snapshot (np. kolizje save_id lub zla strukture).
+	if not validate(data):
+		push_warning("WOW save: snapshot rejected by schema v1; existing save untouched")
+		return false
 	var temporary: String = path + ".tmp"
 	var file: FileAccess = FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
@@ -201,6 +207,11 @@ func read_file(path: String = SAVE_PATH) -> Dictionary:
 		return {}
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
+		return {}
+	# Limit rozmiaru zabezpiecza przed przypadkowym odczytem
+	# uszkodzonego lub niekontrolowanie rozrosnietego pliku.
+	if file.get_length() > MAX_SAVE_BYTES:
+		push_warning("WOW save: file exceeds schema v1 safety limit")
 		return {}
 	var parser := JSON.new()
 	if parser.parse(file.get_as_text()) != OK or not validate(parser.data):
