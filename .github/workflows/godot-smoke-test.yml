@@ -127,6 +127,15 @@ jobs:
             echo "Inventory test failed"
             exit 1
           fi
+      - name: Test intermediate depots, shared ports and persistent reservations
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/logistics_depot_smoke.gd 2>&1 | tee /tmp/wow-depot.log
+          grep -F 'DEPOT SMOKE OK' /tmp/wow-depot.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|DEPOT TEST:' /tmp/wow-depot.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
