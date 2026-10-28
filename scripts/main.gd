@@ -21,6 +21,8 @@ const SOLAR_SCRIPT = preload("res://scripts/solar_array.gd")
 const BATTERY_SCRIPT = preload("res://scripts/battery_bank.gd")
 const POWER_CABLE_SCRIPT = preload("res://scripts/power_cable.gd")
 const BUILD_PREVIEW_SCRIPT = preload("res://scripts/build_placement_preview.gd")
+const ROADS_SCRIPT = preload("res://scripts/technical_roads.gd")
+const BLUEPRINTS_SCRIPT = preload("res://scripts/construction_blueprints.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
@@ -88,6 +90,14 @@ var build_preview = null
 var preview_elapsed: float = 0.0
 var placement_rotation_quarters: int = 0
 var placement_snap_size: int = 1
+var roads = null
+var blueprints = null
+var planning_enabled: bool = false
+var sticky_build_enabled: bool = false
+var road_mode: bool = false
+var road_anchors: Array[Vector3] = []
+var road_preview_route: Array[Vector2i] = []
+var road_hover_elapsed: float = 0.0
 
 
 func _ready() -> void:
@@ -101,6 +111,7 @@ func _ready() -> void:
 	_create_camera()
 	_create_hud()
 	_create_build_preview()
+	_create_infrastructure_planner()
 	_create_training_timer()
 
 
@@ -401,6 +412,91 @@ func _cycle_planet() -> void:
 	if hud != null:
 		hud.set_planet(planet_name)
 	_set_status("Podglad biomu: %s. To zmiana wygladu mapy, bez teleportacji." % planet_name)
+
+
+func _create_infrastructure_planner() -> void:
+	roads = ROADS_SCRIPT.new()
+	add_child(roads)
+	blueprints = BLUEPRINTS_SCRIPT.new()
+	add_child(blueprints)
+	for robot in workers:
+		robot.road_network = roads
+	_update_planning_hud()
+
+
+func _update_planning_hud() -> void:
+	if hud != null and blueprints != null:
+		hud.set_planning_state(planning_enabled, sticky_build_enabled,
+		blueprints.entries.size(), blueprints.describe_cost(Callable(self, "_build_cost")))
+
+
+func _build_cost(kind: String) -> Dictionary:
+	match kind:
+		"mine":
+			return MINE_COST
+		"smelter":
+			return SMELTER_COST
+		"center":
+			return TOWN_HALL_COST
+		"forester":
+			return FORESTER_COST
+		"solar":
+			return SOLAR_ARRAY_COST
+		"battery":
+			return BATTERY_BANK_COST
+	return {}
+
+
+func _toggle_planning() -> void:
+	planning_enabled = not planning_enabled
+	_update_planning_hud()
+	_set_status("PROJEKT: %s | Shift+LPM dodaje plan; Enter buduje, Backspace cofa." %
+		("WLACZONY" if planning_enabled else "WYLACZONY"))
+
+
+func _toggle_sticky_build() -> void:
+	sticky_build_enabled = not sticky_build_enabled
+	_update_planning_hud()
+	_set_status("Seria budowy %s (L, V i K)." %
+		("AKTYWNA" if sticky_build_enabled else "WYLACZONA"))
+
+
+func _queue_building_blueprint(screen_position: Vector2) -> void:
+	var kind: String = _active_build_kind()
+	var hit: Dictionary = _build_site_at_mouse(screen_position, kind)
+	if hit.is_empty():
+		_set_status("Projekt: wybierz teren mapy.")
+		return
+	var site: Vector3 = hit["site"]
+	if not _can_place_structure_at(site, kind):
+		_set_status("Projekt koliduje z istniejacym lub zaplanowanym budynkiem.")
+		return
+	if blueprints.entries.size() >= blueprints.MAX_BLUEPRINTS:
+		_set_status("Limit projektu: 12 konstrukcji.")
+		return
+	var total: Dictionary = blueprints.total_cost(Callable(self, "_build_cost"))
+	for res_type in _build_cost(kind):
+		total[res_type] = int(total.get(res_type, 0)) + int(_build_cost(kind)[res_type])
+	if not _can_afford(total):
+		_set_status("W projekcie brakuje zasobow do kolejnej konstrukcji.")
+		return
+	blueprints.add_blueprint(kind, site, placement_rotation_quarters)
+	_update_planning_hud()
+	_set_status("Projekt: %d budynkow (%s). Enter zatwierdzi calosc." %
+		[blueprints.entries.size(), blueprints.describe_cost(Callable(self, "_build_cost"))])
+
+
+func _clear_blueprints() -> void:
+	if blueprints != null:
+		blueprints.clear_plan()
+	_update_planning_hud()
+	_set_status("Wyczyszczono niezrealizowany projekt (bez kosztow).")
+
+
+func _undo_blueprint() -> void:
+	if blueprints != null and blueprints.pop_last():
+		_update_planning_hud()
+		_set_status("Cofnieto ostatni element projektu.")
 
 
 func _create_build_preview() -> void:
