@@ -5,6 +5,7 @@ extends StaticBody3D
 signal stock_changed
 
 const MODEL = preload("res://scripts/factory_models.gd")
+const INVENTORY = preload("res://scripts/inventory.gd")
 const CLEARANCE_RADIUS: float = 3.9
 const POWER_KW: float = 2.5
 const CYCLE_SECONDS: float = 3.0
@@ -13,8 +14,24 @@ const MAX_ORE: int = 80
 const MAX_METAL: int = 40
 
 var power_enabled: bool = false
-var ore_stock: int = 0
-var metal_stock: int = 0
+var input_buffer = INVENTORY.new("factory:smelter:input")
+var output_buffer = INVENTORY.new("factory:smelter:output")
+var ore_stock: int:
+	get:
+		return input_buffer.quantity("iron_ore")
+	set(value):
+		input_buffer.stock["iron_ore"] = clampi(value, 0, MAX_ORE)
+var metal_stock: int:
+	get:
+		return output_buffer.quantity("metal")
+	set(value):
+		output_buffer.stock["metal"] = clampi(value, 0, MAX_METAL)
+
+
+func _init() -> void:
+	input_buffer.configure("iron_ore", MAX_ORE)
+	output_buffer.configure("metal", MAX_METAL)
+
 var accumulated: float = 0.0
 var machine_visual = null
 
@@ -53,25 +70,42 @@ func _process(delta: float) -> void:
 	accumulated += delta
 	while accumulated >= CYCLE_SECONDS and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL:
 		accumulated -= CYCLE_SECONDS
-		ore_stock -= ORE_PER_METAL
-		metal_stock += 1
+		var consumed: int = input_buffer.pull("iron_ore", ORE_PER_METAL)
+		if consumed < ORE_PER_METAL:
+			return
+		var produced: int = output_buffer.push("metal", 1)
+		assert(produced == 1, "Smelter output must have space before consuming ore")
 		stock_changed.emit()
 
 
 func deposit_ore(quantity: int) -> int:
-	var accepted: int = mini(maxi(quantity, 0), MAX_ORE - ore_stock)
-	ore_stock += accepted
+	return deposit_resource("iron_ore", quantity)
+
+
+func collect_metal(requested: int) -> int:
+	return withdraw_resource("metal", requested)
+
+
+func deposit_resource(resource_type: String, quantity: int) -> int:
+	var accepted: int = input_buffer.push(resource_type, quantity)
 	if accepted > 0:
 		stock_changed.emit()
 	return accepted
 
 
-func collect_metal(requested: int) -> int:
-	var amount: int = mini(maxi(requested, 0), metal_stock)
-	metal_stock -= amount
+func withdraw_resource(resource_type: String, requested: int) -> int:
+	var amount: int = output_buffer.pull(resource_type, requested)
 	if amount > 0:
 		stock_changed.emit()
 	return amount
+
+
+func get_input_port(resource_type: String):
+	return input_buffer if resource_type == "iron_ore" else null
+
+
+func get_output_port(resource_type: String):
+	return output_buffer if resource_type == "metal" else null
 
 
 func get_access_radius() -> float:
@@ -92,11 +126,18 @@ func describe() -> String:
 func to_dict() -> Dictionary:
 	return {"save_id": str(get_meta("save_id", "")), "position":
 		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
-		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated}
+		"ore_stock": ore_stock, "metal_stock": metal_stock, "accumulated": accumulated,
+		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict()}
 
 
 func from_dict(data: Dictionary) -> void:
 	set_meta("save_id", str(data.get("save_id", "")))
-	ore_stock = clampi(int(data.get("ore_stock", 0)), 0, MAX_ORE)
-	metal_stock = clampi(int(data.get("metal_stock", 0)), 0, MAX_METAL)
+	if data.has("input_buffer"):
+		input_buffer.from_dict(data["input_buffer"])
+	else:
+		ore_stock = clampi(int(data.get("ore_stock", 0)), 0, MAX_ORE)
+	if data.has("output_buffer"):
+		output_buffer.from_dict(data["output_buffer"])
+	else:
+		metal_stock = clampi(int(data.get("metal_stock", 0)), 0, MAX_METAL)
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
