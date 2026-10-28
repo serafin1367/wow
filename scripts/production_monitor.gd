@@ -55,7 +55,7 @@ func report(mine, smelter) -> Dictionary:
 		else:
 			mine_status = "PRACUJE"
 	if is_instance_valid(smelter):
-		smelter_progress = 100.0 * clampf(smelter.accumulated / smelter.CYCLE_SECONDS, 0.0, 1.0)
+		smelter_progress = 100.0 * clampf(smelter.accumulated / smelter.active_recipe.duration_seconds, 0.0, 1.0)
 		if smelter.production_paused:
 			smelter_status = "WSTRZYMANA"
 		elif smelter.cycles_remaining == 0:
@@ -64,12 +64,12 @@ func report(mine, smelter) -> Dictionary:
 			smelter_status = "BRAK ENERGII"
 		elif smelter.metal_stock >= smelter.MAX_METAL:
 			smelter_status = "PELNY BUF METALU"
-		elif smelter.ore_stock < smelter.ORE_PER_METAL:
+		elif smelter.ore_stock < smelter.active_recipe.input_amount("iron_ore"):
 			smelter_status = "BRAK RUDY"
 		else:
 			smelter_status = "PRACUJE"
 	return {"ore_per_min": ore_rate, "metal_per_min": metal_rate,
-		"ore_consumed_per_min": metal_rate * 2.0,
+		"ore_consumed_per_min": metal_rate * (float(smelter.active_recipe.input_amount("iron_ore")) / float(maxi(1, smelter.active_recipe.output_amount("metal"))) if is_instance_valid(smelter) else 2.0),
 		"mine_status": mine_status, "smelter_status": smelter_status,
 		"mine_progress": mine_progress, "smelter_progress": smelter_progress,
 		"ore_created": last_ore, "metal_created": last_metal}
