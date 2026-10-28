@@ -20,11 +20,13 @@ func _run() -> void:
 		_fail("Nie mozna otworzyc panelu")
 		return
 	for resolution in [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(900, 680)]:
-		root.content_scale_size = resolution
+		root.size = resolution
+		await process_frame
 		panel._fit_viewport()
 		await process_frame
 		var viewport: Vector2 = root.get_visible_rect().size
 		var bounds: Rect2 = panel.get_global_rect()
+		print("LAYOUT DEBUG: window=", str(root.size), " viewport=", str(viewport), " hud=", str(game.hud.root.size), " panel=", str(bounds))
 		if bounds.position.x < -0.1 or bounds.position.y < -0.1:
 			_fail("Panel wyszedl poza lewy/gorny brzeg: %s: %s" % [str(resolution), str(bounds)])
 			return
