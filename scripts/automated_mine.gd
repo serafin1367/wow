@@ -16,6 +16,7 @@ const MAX_BUFFER: int = 80
 var ore_source = null
 var power_enabled: bool = false
 var production_paused: bool = false
+var production_priority: int = 100
 var cycles_remaining: int = -1
 var output_buffer = INVENTORY.new("factory:mine:output")
 var stock: int:
@@ -122,7 +123,8 @@ func to_dict() -> Dictionary:
 		"stock": stock, "accumulated": accumulated,
 		"source_id": str(ore_source.get_meta("save_id", "")) if is_instance_valid(ore_source) else "",
 		"output_buffer": output_buffer.to_dict(), "total_extracted": total_extracted,
-		"production_paused": production_paused, "cycles_remaining": cycles_remaining}
+		"production_paused": production_paused, "cycles_remaining": cycles_remaining,
+		"production_priority": production_priority}
 
 
 func from_dict(data: Dictionary) -> void:
@@ -134,4 +136,5 @@ func from_dict(data: Dictionary) -> void:
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
 	total_extracted = maxi(0, int(data.get("total_extracted", 0)))
 	production_paused = bool(data.get("production_paused", false))
+	production_priority = clampi(int(data.get("production_priority", 100)), 0, 200)
 	cycles_remaining = maxi(-1, int(data.get("cycles_remaining", -1)))
