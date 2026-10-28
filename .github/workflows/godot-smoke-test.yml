@@ -143,11 +143,16 @@ jobs:
         shell: pwsh
         run: godot --headless --path . --editor --quit
       - name: Save/load filesystem and cargo roundtrip on Windows
-        shell: pwsh
+        shell: bash
         run: |
-          # Setup Godot on Windows exposes a wrapper named godot (without .exe).
-          # Invoke it directly: piping through Out-String treats it as a document.
-          & godot --headless --path . --script res://tests/save_load_smoke.gd
-          if ($LASTEXITCODE -ne 0) {
-            throw "Windows save/load regression failed"
-          }
+          set -o pipefail
+          godot --headless --path . --script res://tests/save_load_smoke.gd > wow-windows-save.log 2>&1
+          code=$?
+          cat wow-windows-save.log
+          if [ "$code" -ne 0 ]; then
+            exit "$code"
+          fi
+          grep -F 'SAVE LOAD SMOKE OK' wow-windows-save.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|SAVE TEST:' wow-windows-save.log; then
+            exit 1
+          fi
