@@ -73,6 +73,61 @@ func _run() -> void:
 		_fail("Parser gubi wyjscie, gdy wejscie i wyjscie sa identyczne")
 		return
 
+	# WOW 0.16: drugi lancuch — metal -> stal -> elektronika.
+	# Receptury sa danymi, warsztat zostanie podlaczony w nastepnym kroku.
+	var steel_recipe = REGISTRY.get_recipe("forge_steel")
+	var electronics_recipe = REGISTRY.get_recipe("assemble_electronics")
+	if steel_recipe == null or electronics_recipe == null:
+		_fail("Brakuje definicji nowych produktow")
+		return
+	if steel_recipe.machine_kind != "workshop" or electronics_recipe.machine_kind != "workshop":
+		_fail("Nowe receptury przypisano niewlasciwej maszynie")
+		return
+	if steel_recipe.input_amount("metal") != 2 or steel_recipe.output_amount("steel") != 1:
+		_fail("Niepoprawny bilans stali")
+		return
+	if electronics_recipe.input_amount("steel") != 1 or electronics_recipe.input_amount("metal") != 1 or electronics_recipe.output_amount("electronics") != 1:
+		_fail("Niepoprawny bilans elektroniki")
+		return
+	var workshop_input = INVENTORY.new("test:workshop:input")
+	var workshop_output = INVENTORY.new("test:workshop:output")
+	workshop_input.configure("metal", 20, 3)
+	workshop_input.configure("steel", 20)
+	workshop_output.configure("steel", 1)
+	workshop_output.configure("electronics", 1)
+	if not steel_recipe.process_once(workshop_input, workshop_output):
+		_fail("Nie wyprodukowano stali mimo dostepnych surowcow")
+		return
+	if workshop_input.quantity("metal") != 1 or workshop_output.quantity("steel") != 1:
+		_fail("Produkcja stali zlamala bilans materialowy")
+		return
+	if steel_recipe.process_once(workshop_input, workshop_output) or workshop_input.quantity("metal") != 1:
+		_fail("Produkcja zuzyla surowce przy braku skladnikow/miejsca")
+		return
+	if workshop_output.pull("steel", 1) != 1 or workshop_input.push("steel", 1) != 1:
+		_fail("Nie mozna przekazac stali do drugiego etapu")
+		return
+	if not workshop_output.reserve_input("reserved-electronics", "electronics", 1):
+		_fail("Nie mozna zarezerwowac wyjscia elektroniki")
+		return
+	if electronics_recipe.process_once(workshop_input, workshop_output):
+		_fail("Elektronika powstala mimo rezerwacji bufora wyjsciowego")
+		return
+	if workshop_input.quantity("metal") != 1 or workshop_input.quantity("steel") != 1:
+		_fail("Zniknely skladniki przy zablokowanym wyjsciu")
+		return
+	workshop_output.cancel_input("reserved-electronics")
+	if not electronics_recipe.process_once(workshop_input, workshop_output):
+		_fail("Nie wznowiono produkcji elektroniki po zwolnieniu wyjscia")
+		return
+	if workshop_input.quantity("metal") != 0 or workshop_input.quantity("steel") != 0 or workshop_output.quantity("electronics") != 1:
+		_fail("Elektronika naruszyla bilans metal + stal -> elektronika")
+		return
+	var electronic_json = RECIPE.from_dict(JSON.parse_string(JSON.stringify(electronics_recipe.to_dict())))
+	if electronic_json == null or electronic_json.input_amount("steel") != 1:
+		_fail("Niepoprawny JSON nowej receptury")
+		return
+
 	var smelter = SMELTER.new()
 	root.add_child(smelter)
 	await process_frame
