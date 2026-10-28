@@ -90,7 +90,7 @@ func _make_top_bar() -> void:
 	branding.custom_minimum_size.x = 150
 	row.add_child(branding)
 	branding.add_child(_label("WOW  /  COLONY", 20, ORANGE, true))
-	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.9", 11, MUTED))
+	branding.add_child(_label("ROBOTIC FRONTIER  •  v0.11", 11, MUTED))
 	row.add_child(VSeparator.new())
 
 	resource_label = _label("", 15, TEXT, true)
@@ -231,6 +231,8 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("PPM   Ruch / zadanie", 13, TEXT))
 	help.add_child(_label("WASD   Kamera", 13, TEXT))
 	help.add_child(_label("Q/E   Obroc kamere", 12, TEXT))
+	help.add_child(_label("R / Shift+R   Obrot budynku", 12, ORANGE))
+	help.add_child(_label("G   Siatka 1/2/4 m", 12, TEXT))
 	help.add_child(_label("SHIFT+J/N   Trasa reczna", 12, TURQUOISE))
 	help.add_child(_label("ENTER   Zbuduj trase", 12, TEXT))
 	help.add_child(_label("ESC   Anuluj budowe", 12, TEXT))
