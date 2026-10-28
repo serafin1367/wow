@@ -94,6 +94,7 @@ func to_dict(game: Node3D) -> Dictionary:
 		"lander": game.landing_rocket.to_dict(),
 		"charger": game.charging_pad.to_dict(),
 		"training": {"active": game.training_in_progress,
+			"role": game.training_role,
 			"time_left": game.training_timer.time_left},
 		"building_options": {"planning": game.planning_enabled,
 			"sticky": game.sticky_build_enabled, "snap": game.placement_snap_size}
@@ -354,6 +355,7 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 			robot.logistics_amount = int(assigned["amount"])
 			robot.logistics_sink = bool(assigned["sink"])
 
+	game.training_role = str(data.get("training", {}).get("role", "miner"))
 	game.training_in_progress = bool(data.get("training", {}).get("active", false))
 	if game.training_in_progress:
 		game.training_timer.start(maxf(0.1, float(data["training"].get("time_left", 4.0))))
