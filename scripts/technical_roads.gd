@@ -121,3 +121,19 @@ func _draw_tiles(batch: MultiMesh, cells: Array[Vector2i]) -> void:
 	for i in range(cells.size()):
 		var cell: Vector2i = cells[i]
 		batch.set_instance_transform(i, Transform3D(Basis(), Vector3(float(cell.x), 0.0, float(cell.y))))
+
+
+func to_dict() -> Dictionary:
+	var cells: Array = []
+	for c in built_cells.keys():
+		cells.append([c.x, c.y])
+	return {"save_id": "roads", "cells": cells}
+
+
+func from_dict(data: Dictionary) -> void:
+	built_cells.clear()
+	for raw in data.get("cells", []):
+		if raw is Array and raw.size() == 2:
+			built_cells[Vector2i(int(raw[0]), int(raw[1]))] = true
+	cancel_preview()
+	_refresh_built()
