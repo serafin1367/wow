@@ -33,6 +33,7 @@ signal production_refresh_requested
 signal production_pause_requested(kind: String)
 signal production_queue_requested(kind: String, cycles: int)
 signal production_priority_requested(kind: String, priority: int)
+signal production_enqueue_requested(kind: String, cycles: int, priority: int)
 signal production_focus_requested(kind: String)
 
 const LOGISTICS_PANEL = preload("res://scripts/logistics_panel.gd")
@@ -106,6 +107,7 @@ func _ready() -> void:
 	production_panel.pause_requested.connect(func(kind: String): production_pause_requested.emit(kind))
 	production_panel.queue_requested.connect(func(kind: String, cycles: int): production_queue_requested.emit(kind, cycles))
 	production_panel.priority_requested.connect(func(kind: String, priority: int): production_priority_requested.emit(kind, priority))
+	production_panel.enqueue_requested.connect(func(kind: String, cycles: int, priority: int): production_enqueue_requested.emit(kind, cycles, priority))
 	production_panel.focus_requested.connect(func(kind: String): production_focus_requested.emit(kind))
 	set_resources(0, 0, 0, 0, 3, 30)
 	set_power(0.0, false)
