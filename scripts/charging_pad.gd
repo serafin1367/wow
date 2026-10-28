@@ -8,6 +8,8 @@ const REQUIRED_POWER: float = 4.0
 
 var power_source = null
 var health: float = 85.0
+var grid_management_enabled: bool = false
+var grid_charge_enabled: bool = false
 var status_label: Label3D
 
 
@@ -43,7 +45,11 @@ func _ready() -> void:
 
 
 func can_charge() -> bool:
-	return is_instance_valid(power_source) and power_source != null and power_source.has_method("solar_output") and power_source.solar_output() >= REQUIRED_POWER and health > 20.0
+	if health <= 20.0:
+		return false
+	if grid_management_enabled:
+		return grid_charge_enabled
+	return is_instance_valid(power_source) and power_source != null and power_source.has_method("solar_output") and power_source.solar_output() >= REQUIRED_POWER
 
 
 func available_rate() -> float:
