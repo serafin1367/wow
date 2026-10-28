@@ -4,6 +4,33 @@ WOW to prototyp ekonomicznej gry strategicznej 3D z kamera RTS.
 Celem jest rozwoj **samowystarczalnej kolonii robotow na obcej planecie**.
 Inspiracja gatunkiem: automatyzacja produkcji i logistyka; oprawa wizualna jest nasza, tworzona w Godot z proceduralnych meshow low-poly.
 
+## WOW 0.16 — rejestr receptur (etap 1)
+
+Wspolna definicja produkcji znajduje sie w `scripts/production_recipe.gd`,
+a katalog `scripts/recipe_registry.gd` przechowuje identyfikatory, typ
+maszyny, wymagane skladniki, produkty, czas cyklu i moc. W rejestrze sa
+teraz **smelt_iron** (2 rudy zelaza -> 1 metal, 3 s, 2.5 kW)
+i **mine_iron_ore** (4 rudy, 1.5 s, 1.5 kW). Definicja kopalni jest
+na razie metadana: wydobycie nadal pobiera zasoby ze skonczonego zloza.
+
+**Huta korzysta juz z danych rejestru**. `ProductionRecipe.can_process()`
+sprawdza rzeczywista dostepnosc surowca oraz miejsca na wyjsciu,
+z uwzglednieniem rezerwacji robotow i tasm. `process_once()` przenosi
+materialy przez wspolny `Inventory` dopiero po przejsciu obu kontroli.
+Przepis ma trwale `recipe_id` w zapisie budynku. Pliki WOW 0.15 bez
+tego pola sa odtwarzane z domyslna receptura `smelt_iron`.
+
+Zapotrzebowanie na moc huty, postep cyklu oraz opis receptury w panelu
+produkcji korzystaja ze wspolnego katalogu. Zachowano dotychczasowy
+bilans gospodarki, a nowe produkty i warsztat z roadmapy pozostaja do
+wdrozenia w kolejnych podetapach.
+
+Testy: `tests/recipe_registry_smoke.gd` sprawdza JSON, poprawnosc
+definicji, brak modyfikacji katalogu przez odbiorce, bilans 2:1,
+rezerwacje we/wy, odrzucenie nieznanego przepisu i zgodnosc starszego
+zapisu. Jest uruchamiany razem z dotychczasowymi testami fabryki,
+kolejek produkcyjnych oraz zapisu w GitHub Actions.
+
 ## WOW 0.15 — centrum zarzadzania produkcja
 
 **V / przycisk V PRODUKCJA:** otwiera panel, w ktorym gracz moze
