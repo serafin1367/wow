@@ -1451,6 +1451,58 @@ func _tick_logistics(delta: float) -> void:
 	logistics_manager.dispatch(workers, navigation)
 
 
+func _toggle_logistics_panel() -> void:
+	if hud != null and hud.toggle_logistics_panel():
+		_refresh_logistics_panel()
+
+
+func _refresh_logistics_panel() -> void:
+	if hud == null:
+		return
+	var depots: Array[Dictionary] = []
+	for i in range(logistics_depots.size()):
+		var node = logistics_depots[i]
+		if not is_instance_valid(node):
+			continue
+		depots.append({
+			"save_id": str(node.get_meta("save_id", "building:depot:%d" % i)),
+			"label": "DEPOT %d" % (i + 1),
+			"stock": node.cargo.stock.duplicate(true),
+			"minimum_stock": node.minimum_stock.duplicate(true),
+			"maximum_stock": node.maximum_stock.duplicate(true)
+		})
+	hud.refresh_logistics_panel(depots, logistics_manager.jobs)
+
+
+func _set_logistics_limits(depot_id: String, resource_type: String, minimum: int, maximum: int) -> void:
+	for hub in logistics_depots:
+		if str(hub.get_meta("save_id", "")) != depot_id:
+			continue
+		if hub.set_stock_limits(resource_type, minimum, maximum):
+			_set_status("%s | %s: MIN %d / MAX %d" % [depot_id, resource_type, minimum, maximum])
+		else:
+			_set_status("Niepoprawny zakres zapasu magazynu.")
+		_refresh_logistics_panel()
+		return
+	_set_status("Nie odnaleziono magazynu dla zadanych limitow.")
+
+
+func _set_logistics_priority(job_id: String, priority: int) -> void:
+	if logistics_manager.set_priority(job_id, priority):
+		_set_status("Zlecenie %s: priorytet %d." % [job_id, clampi(priority, 0, 200)])
+	else:
+		_set_status("Zlecenie nie istnieje.")
+	_refresh_logistics_panel()
+
+
+func _cancel_logistics_job(job_id: String) -> void:
+	if logistics_manager.cancel(job_id, workers):
+		_set_status("Anulowano zlecenie %s, zwolniono rezerwacje." % job_id)
+	else:
+		_set_status("Nie mozna anulowac zlecenia po pobraniu ladunku.")
+	_refresh_logistics_panel()
+
+
 func _create_hud() -> void:
 	hud = HUD_SCRIPT.new()
 	hud.name = "ColonyHUD"
@@ -1467,6 +1519,11 @@ func _create_hud() -> void:
 	hud.battery_bank_requested.connect(_start_energy_build.bind("battery"))
 	hud.road_requested.connect(_start_road_mode)
 	hud.depot_requested.connect(_toggle_depot_mode)
+	hud.logistics_open_requested.connect(_toggle_logistics_panel)
+	hud.logistics_refresh_requested.connect(_refresh_logistics_panel)
+	hud.logistics_stock_limits_requested.connect(_set_logistics_limits)
+	hud.logistics_priority_requested.connect(_set_logistics_priority)
+	hud.logistics_cancel_requested.connect(_cancel_logistics_job)
 	hud.planning_requested.connect(_toggle_planning)
 	hud.sticky_requested.connect(_toggle_sticky_build)
 	hud.commit_plan_requested.connect(_confirm_blueprints)
@@ -1557,6 +1614,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.ctrl_pressed and event.keycode == KEY_O:
 			_load_game()
+			return
+		if event.keycode == KEY_O and not event.ctrl_pressed:
+			_toggle_logistics_panel()
 			return
 		if event.keycode == KEY_U:
 			_toggle_depot_mode()
