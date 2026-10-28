@@ -22,7 +22,8 @@ const DEFINITIONS: Dictionary = {
 		"inputs": {},
 		"outputs": {"iron_ore": 4},
 		"duration_seconds": 1.5,
-		"power_kw": 1.5
+		"power_kw": 1.5,
+		"requires_external_source": true
 	}
 }
 
