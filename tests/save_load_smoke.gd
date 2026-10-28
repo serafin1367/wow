@@ -110,7 +110,9 @@ func _run_test() -> void:
 		_fail("Robot utracil energie lub ladunek")
 		return
 	if fresh.resource_totals != game.resource_totals or fresh.planet_env.current_planet != "Kepler":
-		_fail("Nie odtworzono zapasu magazynu lub planety")
+		_fail("Rozbieznosc magazynu/planety: fresh=%s source=%s planet=%s" % [
+			str(fresh.resource_totals), str(game.resource_totals), fresh.planet_env.current_planet
+		])
 		return
 	if fresh.blueprints.entries.size() != 1 or fresh.roads.built_cells.size() != road.size():
 		_fail("Nie odtworzono drog i projektow")
