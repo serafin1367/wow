@@ -1454,6 +1454,7 @@ func _create_hud() -> void:
 	hud.build_center_requested.connect(_toggle_build_mode)
 	hud.build_forester_requested.connect(_toggle_forester_mode)
 	hud.train_robot_requested.connect(_train_worker)
+	hud.train_hauler_requested.connect(_train_worker.bind("hauler"))
 	hud.charge_requested.connect(_charge_selected)
 	hud.mine_requested.connect(_toggle_mine_mode)
 	hud.smelter_requested.connect(_toggle_smelter_mode)
