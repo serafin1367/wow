@@ -271,7 +271,7 @@ func from_dict(game: Node3D, data: Dictionary) -> bool:
 
 	for row in data["structures"]:
 		var kind: String = str(row.get("kind", ""))
-		if not kind in ["mine", "smelter", "center", "forester", "solar", "battery"]:
+		if not kind in ["mine", "smelter", "center", "forester", "solar", "battery", "depot"]:
 			continue
 		var pos: Vector3 = vec(row.get("position", []))
 		var quarters: int = posmod(roundi(float(row.get("rotation_y", 0.0)) / (PI * 0.5)), 4)
