@@ -45,6 +45,20 @@ func available_output(resource_type: String) -> int:
 	return maxi(0, quantity(resource_type) - _reserved_for(resource_type, false))
 
 
+func push(resource_type: String, requested: int) -> int:
+	var amount: int = mini(maxi(requested, 0), available_input(resource_type))
+	if amount > 0:
+		stock[resource_type] = quantity(resource_type) + amount
+	return amount
+
+
+func pull(resource_type: String, requested: int) -> int:
+	var amount: int = mini(maxi(requested, 0), available_output(resource_type))
+	if amount > 0:
+		stock[resource_type] = quantity(resource_type) - amount
+	return amount
+
+
 func reserve_input(job_id: String, resource_type: String, amount: int) -> bool:
 	if job_id.is_empty() or amount <= 0 or reserved_input.has(job_id) or amount > available_input(resource_type):
 		return false
