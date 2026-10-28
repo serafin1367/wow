@@ -276,8 +276,10 @@ func _route_logistics(pickup: bool) -> bool:
 	if not is_instance_valid(target) or navigation_grid == null:
 		state = WorkState.IDLE
 		return false
-	var radius: float = target.get_access_radius() + 0.55 if target.has_method("get_access_radius") else 3.5
-	var route: Array[Vector3] = navigation_grid.find_access_path(global_position, target.global_position, radius)
+	# Jedna trasa A* do najblizszego osiagalnego pola przy budynku.
+	# find_access_path przeszukuje 48 wariantow i jest zbyt kosztowne
+	# dla kilkunastu zlecen logistycznych przy kazdej aktualizacji.
+	var route: Array[Vector3] = navigation_grid.find_path(global_position, target.global_position)
 	if route.is_empty():
 		state = WorkState.IDLE
 		return false
