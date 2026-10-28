@@ -1503,6 +1503,20 @@ func _cancel_logistics_job(job_id: String) -> void:
 	_refresh_logistics_panel()
 
 
+func _redirect_logistics_job(job_id: String, destination_id: String) -> void:
+	var target = get_node_or_null("Stockpile") if destination_id == "stockpile" else null
+	if target == null:
+		for depot in logistics_depots:
+			if str(depot.get_meta("save_id", "")) == destination_id:
+				target = depot
+				break
+	if target == null or not logistics_manager.reroute_picked(job_id, target, workers):
+		_set_status("Nie mozna zmienic celu: brak wolnego bufora, trasy lub ladunku.")
+	else:
+		_set_status("Przekierowano transport %s do %s." % [job_id, destination_id])
+	_refresh_logistics_panel()
+
+
 func _create_hud() -> void:
 	hud = HUD_SCRIPT.new()
 	hud.name = "ColonyHUD"
@@ -1524,6 +1538,7 @@ func _create_hud() -> void:
 	hud.logistics_stock_limits_requested.connect(_set_logistics_limits)
 	hud.logistics_priority_requested.connect(_set_logistics_priority)
 	hud.logistics_cancel_requested.connect(_cancel_logistics_job)
+	hud.logistics_redirect_requested.connect(_redirect_logistics_job)
 	hud.planning_requested.connect(_toggle_planning)
 	hud.sticky_requested.connect(_toggle_sticky_build)
 	hud.commit_plan_requested.connect(_confirm_blueprints)
