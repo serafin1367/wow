@@ -1158,14 +1158,18 @@ func _update_factory_power() -> void:
 	charging_pad.grid_charge_enabled = charging_pad.health > 20.0 and budget + 0.001 >= charging_pad.REQUIRED_POWER
 	if charging_pad.grid_charge_enabled:
 		budget -= charging_pad.REQUIRED_POWER
+	# W razie niedoboru mocy najpierw zasila sie maszyne o wyzszym
+	# priorytecie. Domyslnie kopalnia 100, huta 90 (jak dotychczas).
+	var machines: Array = []
 	if factory_mine != null:
-		factory_mine.power_enabled = not factory_mine.production_paused and factory_mine.cycles_remaining != 0 and budget + 0.001 >= factory_mine.POWER_KW
-		if factory_mine.power_enabled:
-			budget -= factory_mine.POWER_KW
+		machines.append(factory_mine)
 	if factory_smelter != null:
-		factory_smelter.power_enabled = not factory_smelter.production_paused and factory_smelter.cycles_remaining != 0 and budget + 0.001 >= factory_smelter.POWER_KW
-		if factory_smelter.power_enabled:
-			budget -= factory_smelter.POWER_KW
+		machines.append(factory_smelter)
+	machines.sort_custom(func(left, right): return int(left.production_priority) > int(right.production_priority))
+	for machine in machines:
+		machine.power_enabled = not machine.production_paused and machine.cycles_remaining != 0 and budget + 0.001 >= machine.POWER_KW
+		if machine.power_enabled:
+			budget -= machine.POWER_KW
 	for belt in [ore_conveyor, metal_conveyor]:
 		if belt != null:
 			belt.powered = budget + 0.001 >= belt.POWER_KW
