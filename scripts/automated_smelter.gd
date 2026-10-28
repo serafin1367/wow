@@ -6,7 +6,11 @@ signal stock_changed
 
 const MODEL = preload("res://scripts/factory_models.gd")
 const INVENTORY = preload("res://scripts/inventory.gd")
+const RECIPE_REGISTRY = preload("res://scripts/recipe_registry.gd")
+const DEFAULT_RECIPE_ID: String = "smelt_iron"
 const CLEARANCE_RADIUS: float = 3.9
+## Wartosci zgodnosciowe dla istniejacego HUD i testow WOW 0.15.
+## Jedynym zrodlem danych dla rzeczywistej produkcji jest RecipeRegistry.
 const POWER_KW: float = 2.5
 const CYCLE_SECONDS: float = 3.0
 const ORE_PER_METAL: int = 2
@@ -19,6 +23,8 @@ var production_priority: int = 90
 var cycles_remaining: int = -1
 var production_queue: Array[Dictionary] = []
 var next_order_id: int = 1
+var recipe_id: String = DEFAULT_RECIPE_ID
+var active_recipe = RECIPE_REGISTRY.get_recipe(DEFAULT_RECIPE_ID)
 var input_buffer = INVENTORY.new("factory:smelter:input")
 var output_buffer = INVENTORY.new("factory:smelter:output")
 var ore_stock: int:
@@ -34,6 +40,7 @@ var metal_stock: int:
 
 
 func _init() -> void:
+	assert(active_recipe != null and active_recipe.is_valid(), "Smelter recipe missing from registry")
 	input_buffer.configure("iron_ore", MAX_ORE)
 	output_buffer.configure("metal", MAX_METAL)
 
@@ -69,24 +76,39 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Rezerwacje ladunkow robotow i tasm sa wspolne z Inventory.
+	# Receptura kontroluje komplet wejsc i wyjsc przed kazdym cyklem.
+	var ready: bool = active_recipe != null and active_recipe.can_process(input_buffer, output_buffer)
 	if machine_visual != null:
-		machine_visual.is_working = power_enabled and not production_paused and cycles_remaining != 0 and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL
-	if not power_enabled or production_paused or cycles_remaining == 0 or ore_stock < ORE_PER_METAL or metal_stock >= MAX_METAL:
+		machine_visual.is_working = power_enabled and not production_paused and cycles_remaining != 0 and ready
+	if not power_enabled or production_paused or cycles_remaining == 0 or not ready:
 		return
 	accumulated += delta
-	while accumulated >= CYCLE_SECONDS and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL and cycles_remaining != 0:
-		accumulated -= CYCLE_SECONDS
-		var consumed: int = input_buffer.pull("iron_ore", ORE_PER_METAL)
-		if consumed < ORE_PER_METAL:
-			return
-		var produced: int = output_buffer.push("metal", 1)
-		assert(produced == 1, "Smelter output must have space before consuming ore")
-		total_smelted += produced
+	while accumulated >= active_recipe.duration_seconds and cycles_remaining != 0:
+		if not active_recipe.process_once(input_buffer, output_buffer):
+			# Pelny/zarezerwowany bufor: nie pobieraj rudy ani nie
+			# odbieraj kolejnej jednostki za niedokonczony cykl.
+			break
+		accumulated -= active_recipe.duration_seconds
+		total_smelted += active_recipe.output_amount("metal")
 		if cycles_remaining > 0:
 			cycles_remaining -= 1
 			if cycles_remaining == 0:
 				_activate_next_order()
 		stock_changed.emit()
+
+
+func set_recipe_id(new_id: String) -> bool:
+	var selected = RECIPE_REGISTRY.get_recipe(new_id)
+	if selected == null or selected.machine_kind != "smelter":
+		return false
+	# Nie zmieniaj przepisu w srodku cyklu. Przyszly edytor
+	# receptur bedzie mogl zlecić zmiane po jego zakonczeniu.
+	if accumulated > 0.0 and not is_equal_approx(accumulated, 0.0):
+		return false
+	active_recipe = selected
+	recipe_id = new_id
+	return true
 
 
 func set_production_target(cycles: int) -> void:
@@ -141,11 +163,11 @@ func withdraw_resource(resource_type: String, requested: int) -> int:
 
 
 func get_input_port(resource_type: String):
-	return input_buffer if resource_type == "iron_ore" else null
+	return input_buffer if active_recipe != null and active_recipe.inputs.has(resource_type) else null
 
 
 func get_output_port(resource_type: String):
-	return output_buffer if resource_type == "metal" else null
+	return output_buffer if active_recipe != null and active_recipe.outputs.has(resource_type) else null
 
 
 func get_access_radius() -> float:
@@ -170,10 +192,20 @@ func to_dict() -> Dictionary:
 		"input_buffer": input_buffer.to_dict(), "output_buffer": output_buffer.to_dict(),
 		"total_smelted": total_smelted, "production_paused": production_paused,
 		"cycles_remaining": cycles_remaining, "production_priority": production_priority,
+		"recipe_id": recipe_id,
 		"production_queue": production_queue.duplicate(true), "next_order_id": next_order_id}
 
 
 func from_dict(data: Dictionary) -> void:
+	# Legacy save v1 (WOW 0.15) nie zawieral recipe_id.
+	# Nie pozwalamy obcemu ID wybrac receptury innego typu maszyny.
+	recipe_id = DEFAULT_RECIPE_ID
+	active_recipe = RECIPE_REGISTRY.get_recipe(DEFAULT_RECIPE_ID)
+	var stored_id: String = str(data.get("recipe_id", DEFAULT_RECIPE_ID))
+	var stored_recipe = RECIPE_REGISTRY.get_recipe(stored_id)
+	if stored_recipe != null and stored_recipe.machine_kind == "smelter":
+		recipe_id = stored_id
+		active_recipe = stored_recipe
 	set_meta("save_id", str(data.get("save_id", "")))
 	if data.has("input_buffer"):
 		input_buffer.from_dict(data["input_buffer"])
