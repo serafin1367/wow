@@ -190,6 +190,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|FLEET TEST:' /tmp/wow-fleet.log; then
             exit 1
           fi
+      - name: Test factory production telemetry and stall reasons
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path . --script res://tests/production_monitor_smoke.gd 2>&1 | tee /tmp/wow-production-monitor.log
+          grep -F 'PRODUCTION MONITOR SMOKE OK' /tmp/wow-production-monitor.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|PRODUCTION TEST:' /tmp/wow-production-monitor.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
