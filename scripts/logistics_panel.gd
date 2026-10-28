@@ -6,6 +6,7 @@ signal refresh_requested
 signal stock_limits_requested(depot_id: String, resource_type: String, minimum: int, maximum: int)
 signal priority_requested(job_id: String, value: int)
 signal cancel_requested(job_id: String)
+signal redirect_requested(job_id: String, destination_id: String)
 
 const RESOURCE_TYPES: Array[String] = ["iron_ore", "metal", "wood", "stone", "gold"]
 const RESOURCE_LABELS: Array[String] = ["Ruda", "Metal", "Drewno", "Kamien", "Zloto"]
@@ -143,8 +144,10 @@ func show_state(depots: Array[Dictionary], jobs: Array[Dictionary]) -> void:
 		return
 	for job in jobs:
 		var id: String = str(job.get("id", ""))
+		var group := VBoxContainer.new()
+		job_container.add_child(group)
 		var row := HBoxContainer.new()
-		job_container.add_child(row)
+		group.add_child(row)
 		var details := _label("%s | %s x%d | %s" % [
 			id, str(job.get("resource_type", "")), int(job.get("amount", 0)),
 			str(job.get("status", ""))], 11)
@@ -165,10 +168,39 @@ func show_state(depots: Array[Dictionary], jobs: Array[Dictionary]) -> void:
 		cancel.disabled = str(job.get("status", "")) == "picked"
 		cancel.pressed.connect(_request_cancel.bind(id))
 		row.add_child(cancel)
+		if str(job.get("status", "")) == "picked":
+			var redirect_row := HBoxContainer.new()
+			group.add_child(redirect_row)
+			redirect_row.add_child(_label("NOWY CEL:", 11))
+			var destination_picker := OptionButton.new()
+			destination_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			for depot in depot_records:
+				var depot_id: String = str(depot.get("save_id", ""))
+				if depot_id == str(job.get("destination_id", "")):
+					continue
+				var destination_index: int = destination_picker.item_count
+				destination_picker.add_item(str(depot.get("label", "")))
+				destination_picker.set_item_metadata(destination_index, depot_id)
+			if str(job.get("resource_type", "")) == "metal" and str(job.get("destination_id", "")) != "stockpile":
+				var index: int = destination_picker.item_count
+				destination_picker.add_item("SKLAD GLOWNY")
+				destination_picker.set_item_metadata(index, "stockpile")
+			redirect_row.add_child(destination_picker)
+			var reroute := Button.new()
+			reroute.text = "ZMIEN CEL"
+			reroute.disabled = destination_picker.item_count == 0
+			reroute.pressed.connect(_request_redirect.bind(id, destination_picker))
+			redirect_row.add_child(reroute)
 
 
 func _request_priority(id: String, editor: SpinBox) -> void:
 	priority_requested.emit(id, int(editor.value))
+
+
+func _request_redirect(id: String, picker: OptionButton) -> void:
+	if picker.selected < 0:
+		return
+	redirect_requested.emit(id, str(picker.get_item_metadata(picker.selected)))
 
 
 func _request_cancel(id: String) -> void:
