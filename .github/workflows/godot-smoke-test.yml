@@ -145,6 +145,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|JOB TEST:' /tmp/wow-jobs.log; then
             exit 1
           fi
+      - name: Test multiple depots sharing one reserved mine output
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path . --script res://tests/logistics_multidepot_smoke.gd 2>&1 | tee /tmp/wow-multi-depot.log
+          grep -F 'MULTIDEPOT SMOKE OK' /tmp/wow-multi-depot.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|MULTIDEPOT TEST:' /tmp/wow-multi-depot.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
