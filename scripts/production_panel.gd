@@ -5,6 +5,7 @@ signal refresh_requested
 signal pause_requested(kind: String)
 signal queue_requested(kind: String, cycles: int)
 signal priority_requested(kind: String, priority: int)
+signal enqueue_requested(kind: String, cycles: int, priority: int)
 signal focus_requested(kind: String)
 
 const BG_COLOR: Color = Color(0.055, 0.11, 0.15, 0.98)
@@ -169,6 +170,17 @@ func _add_machine(machine: Dictionary) -> void:
 	apply.text = "USTAW"
 	apply.pressed.connect(_send_queue.bind(kind, remaining))
 	controls.add_child(apply)
+	var add_batch := Button.new()
+	add_batch.text = "DODAJ"
+	add_batch.tooltip_text = "Dodaj kolejna partie do kolejki"
+	add_batch.pressed.connect(_send_enqueue.bind(kind, remaining, machine))
+	controls.add_child(add_batch)
+	var queue: Array = machine.get("queue", [])
+	if not queue.is_empty():
+		var parts: Array[String] = []
+		for item in queue:
+			parts.append("%d cykli (P%d)" % [int(item.get("cycles", 0)), int(item.get("priority", 100))])
+		block.add_child(_label("Kolejka: " + ", ".join(parts), 11))
 	var priority_row := HBoxContainer.new()
 	block.add_child(priority_row)
 	priority_row.add_child(_label("Priorytet zasilania:", 11))
@@ -183,6 +195,10 @@ func _add_machine(machine: Dictionary) -> void:
 	priority_button.text = "USTAW"
 	priority_button.pressed.connect(_send_priority.bind(kind, priority))
 	priority_row.add_child(priority_button)
+
+
+func _send_enqueue(kind: String, editor: SpinBox, machine: Dictionary) -> void:
+	enqueue_requested.emit(kind, int(editor.value), int(machine.get("priority", 100)))
 
 
 func _send_priority(kind: String, editor: SpinBox) -> void:
