@@ -1419,6 +1419,7 @@ func _create_hud() -> void:
 	hud.solar_array_requested.connect(_start_energy_build.bind("solar"))
 	hud.battery_bank_requested.connect(_start_energy_build.bind("battery"))
 	hud.road_requested.connect(_start_road_mode)
+	hud.depot_requested.connect(_toggle_depot_mode)
 	hud.planning_requested.connect(_toggle_planning)
 	hud.sticky_requested.connect(_toggle_sticky_build)
 	hud.commit_plan_requested.connect(_confirm_blueprints)
@@ -1480,6 +1481,8 @@ func _update_colony_hud() -> void:
 			hud.set_structure("KOPALNIA ZELAZA", factory_mine.describe() + (" | TASMA RUDA" if ore_conveyor != null else ""))
 		elif selected_structure == factory_smelter:
 			hud.set_structure("HUTA METALU", factory_smelter.describe() + (" | TASMA METAL" if metal_conveyor != null else ""))
+		elif selected_structure in logistics_depots:
+			hud.set_structure("MAGAZYN POSREDNI", selected_structure.describe())
 		elif selected_structure in solar_arrays:
 			hud.set_structure("PANEL SLONECZNY", selected_structure.describe())
 		elif selected_structure in battery_banks:
@@ -1675,7 +1678,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cancel_manual_conveyor()
 			_set_status("Anulowano reczne ukladanie tasmy.")
 			return
-		if build_mode or forester_build_mode or mine_build_mode or smelter_build_mode:
+		if build_mode or forester_build_mode or mine_build_mode or smelter_build_mode or depot_build_mode:
 			_cancel_build_modes()
 			_set_status("Anulowano budowe.")
 		else:
@@ -1693,7 +1696,7 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 	var building_hit := _raycast(screen_position, 8)
 	if building_hit.has("collider"):
 		var structure = building_hit["collider"]
-		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter or structure in solar_arrays or structure in battery_banks:
+		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter or structure in solar_arrays or structure in battery_banks or structure in logistics_depots:
 			selected_structure = structure
 			if structure == town_hall:
 				_set_status("Centrum: T szkoli kolejnego gornika.")
@@ -1707,7 +1710,7 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 				_set_status("Kopalnia: %s" % factory_mine.describe())
 			elif structure == factory_smelter:
 				_set_status("Huta: %s" % factory_smelter.describe())
-			elif structure in solar_arrays or structure in battery_banks:
+			elif structure in solar_arrays or structure in battery_banks or structure in logistics_depots:
 				_set_status(structure.describe())
 
 
