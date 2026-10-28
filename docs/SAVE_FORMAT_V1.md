@@ -76,7 +76,9 @@ typów; nie jest kompletnym snapshotem do wczytania.
 ## S2 — procedura zapisu i odczytu
 
 1. `SaveGameManager.to_dict(game)` zbiera dane sceny, nie odwołania.
-2. `SaveGameManager.validate(snapshot)` weryfikuje wersję, wymagane
+2. `SaveGameManager.validate(snapshot)` odrzuca również wszystkie typy natywne
+   Godota (np. `StringName` i `Vector3`), zamiast pozwalać na ich
+   niejawne przekształcenie w tekst. Sprawdza wersję, wymagane
    kategorie, dozwolone typy, unikalność `save_id`, poprawność ilości
    oraz podstawową geometrię. **Niepoprawny snapshot nie może
    nadpisać prawidłowego slotu.**
@@ -91,7 +93,7 @@ typów; nie jest kompletnym snapshotem do wczytania.
 6. Oryginalna rozgrywka jest zastępowana dopiero po pomyślnym
    odtworzeniu; uszkodzony lub niezgodny plik nie może jej usunąć.
 
-`save_id` nie jest nazwał węzła Godota: nazwy mogą ulegać zmianie,
+`save_id` nie jest nazwą węzła Godota: nazwy mogą ulegać zmianie,
 np. podczas powielania drzew. Trwałe ID jest kluczem mapowania,
 którego używają również zlecenia logistyczne.
 
