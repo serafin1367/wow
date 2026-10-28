@@ -199,6 +199,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|PRODUCTION TEST:' /tmp/wow-production-monitor.log; then
             exit 1
           fi
+      - name: Test production console, finite queues, pause and alarms
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 60s godot --headless --path . --script res://tests/production_console_smoke.gd 2>&1 | tee /tmp/wow-production-console.log
+          grep -F 'PRODUCTION CONSOLE SMOKE OK' /tmp/wow-production-console.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|PRODUCTION CONSOLE TEST:' /tmp/wow-production-console.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
