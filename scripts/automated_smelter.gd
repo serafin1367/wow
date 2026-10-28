@@ -16,6 +16,7 @@ var power_enabled: bool = false
 var ore_stock: int = 0
 var metal_stock: int = 0
 var accumulated: float = 0.0
+var machine_visual = null
 
 
 func _ready() -> void:
@@ -23,6 +24,7 @@ func _ready() -> void:
 	collision_layer = 4 | 8
 	collision_mask = 0
 	var visual = MODEL.new()
+	machine_visual = visual
 	visual.machine_type = "smelter"
 	add_child(visual)
 
@@ -44,6 +46,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if machine_visual != null:
+		machine_visual.is_working = power_enabled and ore_stock >= ORE_PER_METAL and metal_stock < MAX_METAL
 	if not power_enabled or ore_stock < ORE_PER_METAL or metal_stock >= MAX_METAL:
 		return
 	accumulated += delta
