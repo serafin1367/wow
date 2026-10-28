@@ -6,6 +6,7 @@ extends StaticBody3D
 signal stock_changed
 
 const MODEL = preload("res://scripts/factory_models.gd")
+const INVENTORY = preload("res://scripts/inventory.gd")
 const CLEARANCE_RADIUS: float = 3.0
 const POWER_KW: float = 1.5
 const CYCLE_SECONDS: float = 1.5
@@ -14,7 +15,17 @@ const MAX_BUFFER: int = 80
 
 var ore_source = null
 var power_enabled: bool = false
-var stock: int = 0
+var output_buffer = INVENTORY.new("factory:mine:output")
+var stock: int:
+	get:
+		return output_buffer.quantity("iron_ore")
+	set(value):
+		output_buffer.stock["iron_ore"] = clampi(value, 0, MAX_BUFFER)
+
+
+func _init() -> void:
+	output_buffer.configure("iron_ore", MAX_BUFFER)
+
 var accumulated: float = 0.0
 var machine_visual = null
 
@@ -57,7 +68,8 @@ func _process(delta: float) -> void:
 		var count: int = mini(RATE, MAX_BUFFER - stock)
 		var extracted: int = ore_source.harvest(count)
 		if extracted > 0:
-			stock += extracted
+			var accepted: int = output_buffer.push("iron_ore", extracted)
+			assert(accepted == extracted, "Mine output buffer must accept extracted ore")
 			stock_changed.emit()
 
 
@@ -66,11 +78,18 @@ func has_ore() -> bool:
 
 
 func withdraw(requested: int) -> int:
-	var amount: int = mini(maxi(requested, 0), stock)
-	stock -= amount
+	return withdraw_resource("iron_ore", requested)
+
+
+func withdraw_resource(resource_type: String, requested: int) -> int:
+	var amount: int = output_buffer.pull(resource_type, requested)
 	if amount > 0:
 		stock_changed.emit()
 	return amount
+
+
+func get_output_port(resource_type: String):
+	return output_buffer if resource_type == "iron_ore" else null
 
 
 func get_access_radius() -> float:
@@ -91,10 +110,14 @@ func to_dict() -> Dictionary:
 	return {"save_id": str(get_meta("save_id", "")), "position":
 		[global_position.x, global_position.y, global_position.z], "rotation_y": rotation.y,
 		"stock": stock, "accumulated": accumulated,
-		"source_id": str(ore_source.get_meta("save_id", "")) if is_instance_valid(ore_source) else ""}
+		"source_id": str(ore_source.get_meta("save_id", "")) if is_instance_valid(ore_source) else "",
+		"output_buffer": output_buffer.to_dict()}
 
 
 func from_dict(data: Dictionary) -> void:
 	set_meta("save_id", str(data.get("save_id", "")))
-	stock = clampi(int(data.get("stock", 0)), 0, MAX_BUFFER)
+	if data.has("output_buffer"):
+		output_buffer.from_dict(data["output_buffer"])
+	else:
+		stock = clampi(int(data.get("stock", 0)), 0, MAX_BUFFER)
 	accumulated = maxf(0.0, float(data.get("accumulated", 0.0)))
