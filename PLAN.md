@@ -61,7 +61,7 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 ### WOW 0.14 — magazyny pośrednie i logistyka (P0) — **w trakcie**
 
-**Zrealizowano:** magazyn pośredni `U` (do 3 budynków), magazyny/bufory `Inventory`, wspólne porty kopalni, huty, robotów i taśm, `LogisticsManager` z priorytetami, rezerwacjami i zapisem zleceń w drodze. Zobacz `tests/inventory_smoke.gd`, `tests/logistics_depot_smoke.gd`, `tests/logistics_jobs_smoke.gd` oraz `tests/save_load_smoke.gd`. **Pozostało:** interfejs użytkownika do edycji priorytetów i min./maks. zapasu, bezpieczna zmiana celu przy transporcie, pełna obsługa wszystkich magazynów i długie testy floty.
+**Zrealizowano:** budowanie magazynów pośrednich `U` (do 3), wspólne porty `Inventory` dla kopalni, huty, robotów i taśm, `LogisticsManager` z priorytetowymi zleceniami i rezerwacjami, szkolenie dodatkowych transportowców `Shift+T` i zapis aktywnych zleceń. Zadania mogą prowadzić przez wiele magazynów, bez podwójnego rezerwowania zasobów. Przeszły testy `tests/inventory_smoke.gd`, `tests/logistics_depot_smoke.gd`, `tests/logistics_jobs_smoke.gd`, `tests/logistics_multidepot_smoke.gd` i `tests/save_load_smoke.gd`; [CI Linux + Windows](https://github.com/serafin1367/wow/actions/runs/40685120883). **Pozostało:** panel gracza do ustawiania priorytetów i min./maks. zapasu, obsługa zmiany celu w trakcie jazdy, reagowanie na całkowicie niedostępne trasy i długie testy całej floty.
 
 - [x] Nowy budynek: **depot logistyczny** z ograniczoną pojemnością i kilkoma typami surowca.
 - [x] Model ekwipunku dla magazynów i maszyn: wolne miejsce, rezerwacje, pobranie, dostarczenie.
@@ -74,7 +74,7 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 - [ ] Obsłużyć brak drogi, pełny magazyn, rozładowany robot, zmianę celu i anulowanie zlecenia.
 - [ ] Test wielu magazynów, robotów i taśmociągów korzystających z **tych samych portów**: **każda jednostka ładunku ma dokładnie jednego właściciela**. Zweryfikować również zapis/odczyt z aktywnymi rezerwacjami.
 
-**Stan na 28.10.2026:** automatyczny transfer przez *pierwszy* magazyn i jego serializacja są gotowe; test dwóch równoległych zleceń został dodany. Priorytety i limity magazynowe istnieją jako API, ale nie mają jeszcze panelu ustawień.
+**Stan na 28.10.2026:** automatyczna kolejka przez wiele magazynów jest gotowa, dwa równoległe przydziały oraz współdzielone rezerwacje z kilku magazynów zostały przetestowane. Priorytety i limity `min/max` istnieją jako API (`set_priority`, `set_stock_limits`) i są utrwalane w zapisie, ale nie mają jeszcze panelu konfiguracyjnego. Zadania w trakcie transportu nie są anulowane, by nie zgubić ładunku.
 
 **Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców; przełączenie odbioru z robota na taśmę **nie wymaga zmiany logiki magazynu**. Proponowane moduły: `Inventory`, `BufferPort`, `LogisticsManager`, `TransportJob`.
 
