@@ -98,6 +98,18 @@ func set_recipe_id(new_id: String) -> bool:
 	active_recipe = candidate
 	return true
 
+func enqueue_production(cycles: int, _priority: int = 100) -> bool:
+	if cycles <= 0 or cycles > 1000:
+		return false
+	if cycles_remaining < 0:
+		cycles_remaining = cycles
+	else:
+		cycles_remaining += cycles
+	return true
+
+func describe() -> String:
+	return "%s | metal %d, stal %d | wyjscie: stal %d, elektronika %d" % [active_recipe.display_name, input_buffer.quantity("metal"), input_buffer.quantity("steel"), output_buffer.quantity("steel"), output_buffer.quantity("electronics")]
+
 func set_production_target(cycles: int) -> void:
 	cycles_remaining = maxi(-1, cycles)
 
