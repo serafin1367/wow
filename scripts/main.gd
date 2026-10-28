@@ -17,6 +17,9 @@ const DEPOT_VISUAL_SCRIPT = preload("res://scripts/depot_model.gd")
 const MINE_SCRIPT = preload("res://scripts/automated_mine.gd")
 const SMELTER_SCRIPT = preload("res://scripts/automated_smelter.gd")
 const CONVEYOR_SCRIPT = preload("res://scripts/conveyor_link.gd")
+const SOLAR_SCRIPT = preload("res://scripts/solar_array.gd")
+const BATTERY_SCRIPT = preload("res://scripts/battery_bank.gd")
+const POWER_CABLE_SCRIPT = preload("res://scripts/power_cable.gd")
 const START_PLANET = "Mars"
 const LANDER_POSITION: Vector3 = Vector3(0.0, 0.0, -12.0)
 const CHARGER_POSITION: Vector3 = Vector3(-9.0, 0.0, -10.0)
@@ -34,6 +37,10 @@ const SMELTER_COST: Dictionary = {"wood": 30, "stone": 20}
 const SMELTER_RADIUS: float = 3.9
 const ORE_CONVEYOR_COST: Dictionary = {"metal": 5}
 const METAL_CONVEYOR_COST: Dictionary = {"metal": 8}
+const SOLAR_ARRAY_COST: Dictionary = {"metal": 8, "stone": 5}
+const BATTERY_BANK_COST: Dictionary = {"metal": 12, "stone": 8}
+const MAX_SOLAR_ARRAYS: int = 5
+const MAX_BATTERIES: int = 3
 const MAX_WORKERS: int = 30
 const DEPOT_POSITION: Vector3 = Vector3(0.0, 0.0, 8.0)
 const MAP_SIZE: float = 100.0
@@ -69,6 +76,13 @@ var metal_conveyor = null
 var manual_conveyor_kind: String = ""
 var manual_conveyor_points: Array[Vector3] = []
 var manual_conveyor_preview = null
+var solar_arrays: Array = []
+var battery_banks: Array = []
+var power_cables: Array = []
+var energy_build_kind: String = ""
+var grid_generation_kw: float = 0.0
+var grid_consumption_kw: float = 0.0
+var battery_draw_kw: float = 0.0
 
 
 func _ready() -> void:
@@ -358,16 +372,7 @@ func _create_landing_site() -> void:
 	add_child(charging_pad)
 	navigation.block_circle(Vector2(CHARGER_POSITION.x, CHARGER_POSITION.z), charging_pad.get_access_radius())
 
-	# Wizualny przewod energetyczny, poza siatka kolizji.
-	var cable := MeshInstance3D.new()
-	cable.name = "SolarPowerCable"
-	var line := BoxMesh.new()
-	line.size = Vector3(LANDER_POSITION.distance_to(CHARGER_POSITION), 0.10, 0.16)
-	cable.mesh = line
-	cable.position = (LANDER_POSITION + CHARGER_POSITION) * 0.5 + Vector3(0.0, 0.055, 0.0)
-	cable.rotation.y = -atan2(CHARGER_POSITION.z - LANDER_POSITION.z, CHARGER_POSITION.x - LANDER_POSITION.x)
-	cable.material_override = _make_material(Color(0.09, 0.78, 0.85))
-	add_child(cable)
+	_connect_power_node(charging_pad)
 
 
 func _create_planet_environment() -> void:
@@ -393,6 +398,7 @@ func _cycle_planet() -> void:
 
 
 func _cancel_build_modes() -> void:
+	energy_build_kind = ""
 	_cancel_manual_conveyor()
 	build_mode = false
 	forester_build_mode = false
@@ -432,6 +438,7 @@ func _try_place_mine(screen_position: Vector2) -> void:
 	factory_mine.ore_source = source
 	factory_mine.position = source.global_position
 	add_child(factory_mine)
+	_connect_power_node(factory_mine)
 	# Zloze zachowuje ilosc surowca, ale wydobywa je tylko ekstraktor.
 	source.collision_layer = 0
 	source.visible = false
@@ -476,6 +483,7 @@ func _try_place_smelter(screen_position: Vector2) -> void:
 	factory_smelter = SMELTER_SCRIPT.new()
 	factory_smelter.position = site
 	add_child(factory_smelter)
+	_connect_power_node(factory_smelter)
 	navigation.block_circle(Vector2(site.x, site.z), SMELTER_RADIUS)
 	smelter_build_mode = false
 	_update_factory_power()
@@ -506,26 +514,125 @@ func _is_smelter_site_clear(site: Vector3) -> bool:
 	return true
 
 
+func _connect_power_node(node: Node3D) -> void:
+	if not is_instance_valid(landing_rocket):
+		return
+	var cable = POWER_CABLE_SCRIPT.new()
+	cable.setup(LANDER_POSITION, node.global_position)
+	add_child(cable)
+	power_cables.append(cable)
+
+
+func _start_energy_build(kind: String) -> void:
+	_cancel_build_modes()
+	var limit: int = MAX_SOLAR_ARRAYS if kind == "solar" else MAX_BATTERIES
+	var current: int = solar_arrays.size() if kind == "solar" else battery_banks.size()
+	if current >= limit:
+		_set_status("Osiagnieto limit instalacji energetycznych: %d." % limit)
+		return
+	var cost: Dictionary = SOLAR_ARRAY_COST if kind == "solar" else BATTERY_BANK_COST
+	if not _can_afford(cost):
+		_set_status("Brak materialow: %d metalu + %d kamienia." % [cost["metal"], cost["stone"]])
+		return
+	energy_build_kind = kind
+	_set_status("LPM: umiesc %s na wolnym terenie. Esc/PPM: anuluj." % ("panel PV" if kind == "solar" else "magazyn energii"))
+
+
+func _try_place_energy_build(screen_position: Vector2) -> void:
+	var hit: Dictionary = _raycast(screen_position, 1)
+	if hit.is_empty():
+		_set_status("Wybierz wolny grunt.")
+		return
+	var where: Vector3 = hit["position"]
+	var at := Vector3(roundf(where.x), 0.0, roundf(where.z))
+	var kind: String = energy_build_kind
+	var radius: float = SOLAR_SCRIPT.CLEARANCE_RADIUS if kind == "solar" else BATTERY_SCRIPT.CLEARANCE_RADIUS
+	if not _is_energy_site_clear(at, radius):
+		_set_status("Brak miejsca na instalacje. Odsun ja od przeszkod.")
+		return
+	var cost: Dictionary = SOLAR_ARRAY_COST if kind == "solar" else BATTERY_BANK_COST
+	if not _spend_resources(cost):
+		_set_status("Brakuje zasobow do budowy.")
+		return
+	var building = SOLAR_SCRIPT.new() if kind == "solar" else BATTERY_SCRIPT.new()
+	building.position = at
+	add_child(building)
+	navigation.block_circle(Vector2(at.x, at.z), radius)
+	_connect_power_node(building)
+	if kind == "solar":
+		solar_arrays.append(building)
+	else:
+		battery_banks.append(building)
+	energy_build_kind = ""
+	_update_factory_power()
+	_update_action_buttons()
+	_set_status("Zainstalowano %s. Przewod podlaczony do sieci statku." % ("panel sloneczny" if kind == "solar" else "akumulator"))
+
+
+func _is_energy_site_clear(site: Vector3, radius: float) -> bool:
+	if absf(site.x) > 43.0 or absf(site.z) > 43.0:
+		return false
+	if not navigation.is_circle_walkable(Vector2(site.x, site.z), radius):
+		return false
+	for robot in workers:
+		if _ground_distance(site, robot.global_position) < radius + 1.2:
+			return false
+	return true
+
+
+func _tick_battery_grid(delta: float) -> void:
+	if delta <= 0.0 or battery_banks.is_empty():
+		return
+	if battery_draw_kw > 0.0:
+		var needed_kw: float = battery_draw_kw
+		for bank in battery_banks:
+			needed_kw -= bank.discharge_kw(needed_kw, delta)
+	else:
+		var remaining_kw: float = unused_power_kw
+		for bank in battery_banks:
+			remaining_kw -= bank.charge_kw(remaining_kw, delta)
+		unused_power_kw = maxf(0.0, remaining_kw)
+
+
 func _update_factory_power() -> void:
 	if landing_rocket == null or charging_pad == null:
 		return
-	var power: float = landing_rocket.solar_output()
-	if charging_pad.can_charge():
-		power -= charging_pad.REQUIRED_POWER
+
+	# Bilans fizyczny: generacja, pobor odbiornikow, zasob w akumulatorze.
+	# Odbiorniki maja stale priorytety jak we wczesniejszych wersjach.
+	grid_generation_kw = landing_rocket.solar_output()
+	for array in solar_arrays:
+		grid_generation_kw += array.solar_output()
+	var available: float = grid_generation_kw
+	for bank in battery_banks:
+		if bank.stored_kwh > 0.00001:
+			available += minf(bank.MAX_OUTPUT_KW, bank.stored_kwh / (0.25 * bank.GAME_HOURS_PER_SECOND))
+	var budget: float = available
+	charging_pad.grid_management_enabled = true
+	charging_pad.grid_charge_enabled = charging_pad.health > 20.0 and budget + 0.001 >= charging_pad.REQUIRED_POWER
+	if charging_pad.grid_charge_enabled:
+		budget -= charging_pad.REQUIRED_POWER
 	if factory_mine != null:
-		factory_mine.power_enabled = power >= factory_mine.POWER_KW
+		factory_mine.power_enabled = budget + 0.001 >= factory_mine.POWER_KW
 		if factory_mine.power_enabled:
-			power -= factory_mine.POWER_KW
+			budget -= factory_mine.POWER_KW
 	if factory_smelter != null:
-		factory_smelter.power_enabled = power + 0.001 >= factory_smelter.POWER_KW
+		factory_smelter.power_enabled = budget + 0.001 >= factory_smelter.POWER_KW
 		if factory_smelter.power_enabled:
-			power -= factory_smelter.POWER_KW
+			budget -= factory_smelter.POWER_KW
 	for belt in [ore_conveyor, metal_conveyor]:
 		if belt != null:
-			belt.powered = power + 0.001 >= belt.POWER_KW
+			belt.powered = budget + 0.001 >= belt.POWER_KW
 			if belt.powered:
-				power -= belt.POWER_KW
-	unused_power_kw = maxf(0.0, power)
+				budget -= belt.POWER_KW
+
+	grid_consumption_kw = maxf(0.0, available - budget)
+	battery_draw_kw = maxf(0.0, grid_consumption_kw - grid_generation_kw)
+	unused_power_kw = maxf(0.0, grid_generation_kw - grid_consumption_kw)
+	for cable in power_cables:
+		if is_instance_valid(cable):
+			cable.powered = grid_generation_kw > 0.01 or battery_draw_kw > 0.01
+
 
 
 func _start_logistics_if_ready() -> void:
@@ -773,6 +880,8 @@ func _create_hud() -> void:
 	hud.smelter_requested.connect(_toggle_smelter_mode)
 	hud.ore_conveyor_requested.connect(_build_ore_conveyor)
 	hud.metal_conveyor_requested.connect(_build_metal_conveyor)
+	hud.solar_array_requested.connect(_start_energy_build.bind("solar"))
+	hud.battery_bank_requested.connect(_start_energy_build.bind("battery"))
 	hud.planet_change_requested.connect(_cycle_planet)
 	add_child(hud)
 
@@ -790,8 +899,10 @@ func _create_hud() -> void:
 func _process(delta: float) -> void:
 	hud_elapsed += delta
 	if hud_elapsed >= 0.25:
+		var elapsed_energy: float = hud_elapsed
 		hud_elapsed = 0.0
 		_update_factory_power()
+		_tick_battery_grid(elapsed_energy)
 		_update_colony_hud()
 
 
@@ -799,8 +910,12 @@ func _update_colony_hud() -> void:
 	if hud == null:
 		return
 	if landing_rocket != null and charging_pad != null:
-		hud.set_power(landing_rocket.solar_output(), charging_pad.can_charge())
+		hud.set_power(grid_generation_kw, charging_pad.can_charge())
 		hud.set_power_balance(unused_power_kw)
+		var stored_kwh: float = 0.0
+		for bank in battery_banks:
+			stored_kwh += bank.stored_kwh
+		hud.set_energy_storage(stored_kwh, float(battery_banks.size()) * BATTERY_SCRIPT.CAPACITY_KWH, grid_generation_kw)
 
 	if selected_workers.size() == 1:
 		var robot = selected_workers[0]
@@ -820,6 +935,10 @@ func _update_colony_hud() -> void:
 			hud.set_structure("KOPALNIA ZELAZA", factory_mine.describe() + (" | TASMA RUDA" if ore_conveyor != null else ""))
 		elif selected_structure == factory_smelter:
 			hud.set_structure("HUTA METALU", factory_smelter.describe() + (" | TASMA METAL" if metal_conveyor != null else ""))
+		elif selected_structure in solar_arrays:
+			hud.set_structure("PANEL SLONECZNY", selected_structure.describe())
+		elif selected_structure in battery_banks:
+			hud.set_structure("MAGAZYN ENERGII", selected_structure.describe())
 		else:
 			hud.set_no_selection()
 	else:
@@ -870,10 +989,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_build_metal_conveyor()
 			return
+		if event.keycode == KEY_V:
+			_start_energy_build("solar")
+			return
+		if event.keycode == KEY_K:
+			_start_energy_build("battery")
+			return
 		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 			if manual_conveyor_kind != "":
 				_confirm_manual_conveyor()
 				return
+		if event.keycode == KEY_ESCAPE and energy_build_kind != "":
+			energy_build_kind = ""
+			_set_status("Anulowano budowe instalacji energetycznej.")
+			return
 		if event.keycode == KEY_ESCAPE and manual_conveyor_kind != "":
 			_cancel_manual_conveyor()
 			_set_status("Anulowano reczne ukladanie tasmy.")
@@ -895,6 +1024,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
+		if energy_build_kind != "":
+			if event.pressed:
+				_try_place_energy_build(event.position)
+			return
 		if manual_conveyor_kind != "":
 			if event.pressed:
 				_manual_conveyor_click(event.position)
@@ -929,6 +1062,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_dragging = false
 
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if energy_build_kind != "":
+			energy_build_kind = ""
+			_set_status("Anulowano budowe instalacji energetycznej.")
+			return
 		if manual_conveyor_kind != "":
 			_cancel_manual_conveyor()
 			_set_status("Anulowano reczne ukladanie tasmy.")
@@ -951,7 +1088,7 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 	var building_hit := _raycast(screen_position, 8)
 	if building_hit.has("collider"):
 		var structure = building_hit["collider"]
-		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter:
+		if structure == landing_rocket or structure == charging_pad or structure == town_hall or structure in foresters or structure == factory_mine or structure == factory_smelter or structure in solar_arrays or structure in battery_banks:
 			selected_structure = structure
 			if structure == town_hall:
 				_set_status("Centrum: T szkoli kolejnego gornika.")
@@ -965,6 +1102,8 @@ func _select_by_click(screen_position: Vector2, additive: bool) -> void:
 				_set_status("Kopalnia: %s" % factory_mine.describe())
 			elif structure == factory_smelter:
 				_set_status("Huta: %s" % factory_smelter.describe())
+			elif structure in solar_arrays or structure in battery_banks:
+				_set_status(structure.describe())
 
 
 func _select_in_rectangle(rectangle: Rect2, additive: bool) -> void:
@@ -1341,6 +1480,7 @@ func _update_action_buttons() -> void:
 		)
 		hud.set_factory_availability(factory_mine != null, factory_smelter != null)
 		hud.set_conveyor_availability(ore_conveyor != null, metal_conveyor != null, factory_mine != null and factory_smelter != null)
+		hud.set_energy_build_availability(solar_arrays.size(), MAX_SOLAR_ARRAYS, battery_banks.size(), MAX_BATTERIES)
 
 
 func _on_resource_delivered(resource_type: String, amount: int) -> void:
