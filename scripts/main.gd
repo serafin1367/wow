@@ -1167,9 +1167,12 @@ func _update_factory_power() -> void:
 		machines.append(factory_smelter)
 	machines.sort_custom(func(left, right): return int(left.production_priority) > int(right.production_priority))
 	for machine in machines:
-		machine.power_enabled = not machine.production_paused and machine.cycles_remaining != 0 and budget + 0.001 >= machine.POWER_KW
+		var required_power: float = machine.POWER_KW
+		if machine == factory_smelter and factory_smelter.active_recipe != null:
+			required_power = factory_smelter.active_recipe.power_kw
+		machine.power_enabled = not machine.production_paused and machine.cycles_remaining != 0 and budget + 0.001 >= required_power
 		if machine.power_enabled:
-			budget -= machine.POWER_KW
+			budget -= required_power
 	for belt in [ore_conveyor, metal_conveyor]:
 		if belt != null:
 			belt.powered = budget + 0.001 >= belt.POWER_KW
@@ -1563,7 +1566,12 @@ func _production_snapshot() -> Dictionary:
 	if factory_smelter != null:
 		machines.append({
 			"kind": "smelter", "name": "HUTA METALU", "status": report["smelter_status"],
-			"recipe": "%d rudy -> 1 metal / %.1f s | %.1f kW" % [factory_smelter.ORE_PER_METAL, factory_smelter.CYCLE_SECONDS, factory_smelter.POWER_KW],
+			"recipe": "%s: %d rudy -> %d metal / %.1f s | %.1f kW" % [
+				factory_smelter.active_recipe.display_name,
+				factory_smelter.active_recipe.input_amount("iron_ore"),
+				factory_smelter.active_recipe.output_amount("metal"),
+				factory_smelter.active_recipe.duration_seconds,
+				factory_smelter.active_recipe.power_kw],
 			"buffers": "WEJ: %d/%d rudy | WYJ: %d/%d metalu" % [
 				factory_smelter.ore_stock, factory_smelter.MAX_ORE,
 				factory_smelter.metal_stock, factory_smelter.MAX_METAL],
