@@ -28,8 +28,14 @@ signal logistics_stock_limits_requested(depot_id: String, resource_type: String,
 signal logistics_priority_requested(job_id: String, priority: int)
 signal logistics_cancel_requested(job_id: String)
 signal logistics_redirect_requested(job_id: String, destination_id: String)
+signal production_open_requested
+signal production_refresh_requested
+signal production_pause_requested(kind: String)
+signal production_queue_requested(kind: String, cycles: int)
+signal production_focus_requested(kind: String)
 
 const LOGISTICS_PANEL = preload("res://scripts/logistics_panel.gd")
+const PRODUCTION_PANEL = preload("res://scripts/production_panel.gd")
 const BG = Color(0.065, 0.105, 0.145, 0.94)
 const BG_SUBTLE = Color(0.105, 0.16, 0.20, 0.96)
 const BORDER = Color(0.23, 0.34, 0.39, 1.0)
@@ -67,6 +73,7 @@ var planning_button: Button
 var sticky_button: Button
 var plan_info_label: Label
 var logistics_panel = null
+var production_panel = null
 
 
 func _ready() -> void:
@@ -91,6 +98,13 @@ func _ready() -> void:
 		logistics_cancel_requested.emit(a))
 	logistics_panel.redirect_requested.connect(func(a: String, b: String):
 		logistics_redirect_requested.emit(a, b))
+	production_panel = PRODUCTION_PANEL.new()
+	root.add_child(production_panel)
+	production_panel.close_requested.connect(func(): production_panel.visible = false)
+	production_panel.refresh_requested.connect(func(): production_refresh_requested.emit())
+	production_panel.pause_requested.connect(func(kind: String): production_pause_requested.emit(kind))
+	production_panel.queue_requested.connect(func(kind: String, cycles: int): production_queue_requested.emit(kind, cycles))
+	production_panel.focus_requested.connect(func(kind: String): production_focus_requested.emit(kind))
 	set_resources(0, 0, 0, 0, 3, 30)
 	set_power(0.0, false)
 	set_no_selection()
@@ -299,6 +313,11 @@ func _make_bottom_bar() -> void:
 	logistics_action.tooltip_text = "Pokaz magazyny, ustaw progi i priorytety, anuluj zlecenia"
 	logistics_action.pressed.connect(func(): logistics_open_requested.emit())
 	plan_row.add_child(logistics_action)
+	var production_action := Button.new()
+	production_action.text = "V  PRODUKCJA"
+	production_action.tooltip_text = "Maszyny, produkcja/min, kolejki, pauza i alarmy"
+	production_action.pressed.connect(func(): production_open_requested.emit())
+	plan_row.add_child(production_action)
 	var save_action := Button.new()
 	save_action.text = "ZAPISZ"
 	save_action.tooltip_text = "Ctrl+S: zapisz caly stan kolonii"
@@ -330,6 +349,7 @@ func _make_bottom_bar() -> void:
 	help.add_child(_label("D   Droga | F   Plan", 12, TURQUOISE))
 	help.add_child(_label("U   Magazyn posredni", 12, ORANGE))
 	help.add_child(_label("O   Panel logistyki", 12, TURQUOISE))
+	help.add_child(_label("V   Centrum produkcji", 12, ORANGE))
 	help.add_child(_label("Shift+T   Transportowiec", 12, TURQUOISE))
 	help.add_child(_label("X   Budowa seryjna", 12, TEXT))
 	help.add_child(_label("Ctrl+S / Ctrl+O   Zapis / odczyt", 11, TURQUOISE))
@@ -348,6 +368,18 @@ func toggle_logistics_panel() -> bool:
 func refresh_logistics_panel(depots: Array[Dictionary], jobs: Array[Dictionary]) -> void:
 	if logistics_panel != null and logistics_panel.visible:
 		logistics_panel.show_state(depots, jobs)
+
+
+func toggle_production_panel() -> bool:
+	if production_panel == null:
+		return false
+	production_panel.visible = not production_panel.visible
+	return production_panel.visible
+
+
+func refresh_production_panel(data: Dictionary) -> void:
+	if production_panel != null and production_panel.visible:
+		production_panel.show_snapshot(data)
 
 
 func set_production_rates(data: Dictionary) -> void:
