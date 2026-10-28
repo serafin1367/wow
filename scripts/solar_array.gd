@@ -93,3 +93,15 @@ func _mat(color: Color, self_illuminated: bool = false) -> StandardMaterial3D:
 	if self_illuminated:
 		result.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return result
+
+
+func to_dict() -> Dictionary:
+	return {"save_id": str(get_meta("save_id", "")), "position":
+		[global_position.x, global_position.y, global_position.z],
+		"rotation_y": rotation.y, "tracking": tracking, "elapsed": elapsed}
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "")))
+	tracking = bool(data.get("tracking", true))
+	elapsed = float(data.get("elapsed", 0.0))
