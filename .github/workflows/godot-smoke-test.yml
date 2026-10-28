@@ -127,3 +127,26 @@ jobs:
             echo "GDScript errors detected in planet smoke test."
             exit 1
           fi
+
+  windows-save-load:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4 on Windows
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: false
+      - name: Import project on Windows
+        shell: pwsh
+        run: godot --headless --path . --editor --quit
+      - name: Save/load filesystem and cargo roundtrip on Windows
+        shell: pwsh
+        run: |
+          $log = & godot --headless --path . --script res://tests/save_load_smoke.gd 2>&1 | Out-String
+          Write-Host $log
+          if ($LASTEXITCODE -ne 0 -or $log -notmatch 'SAVE LOAD SMOKE OK' -or $log -match 'SCRIPT ERROR:|Parse Error:|SAVE TEST:') {
+            throw "Windows save/load regression failed"
+          }
