@@ -103,8 +103,28 @@ func to_dict(game: Node3D) -> Dictionary:
 	}
 
 
+func _is_json_safe(value: Variant, depth: int = 0) -> bool:
+	# JSON.stringify() zamienialoby np. StringName/Vector3 na tekst.
+	# Nie dopuszczamy takiej utraty informacji w zapisie v1.
+	if depth > 32:
+		return false
+	if value == null or value is String or value is bool or value is int or value is float:
+		return true
+	if value is Array:
+		for item in value:
+			if not _is_json_safe(item, depth + 1):
+				return false
+		return true
+	if value is Dictionary:
+		for key in value.keys():
+			if not (key is String) or not _is_json_safe(value[key], depth + 1):
+				return false
+		return true
+	return false
+
+
 func validate(data: Variant) -> bool:
-	if not (data is Dictionary):
+	if not (data is Dictionary) or not _is_json_safe(data):
 		return false
 	if int(data.get("schema_version", -1)) != SCHEMA_VERSION:
 		return false
@@ -184,12 +204,16 @@ func save_file(game: Node3D, path: String = SAVE_PATH) -> bool:
 	if not validate(data):
 		push_warning("WOW save: snapshot rejected by schema v1; existing save untouched")
 		return false
+	var json_text: String = JSON.stringify(data, "\t")
+	if json_text.to_utf8_buffer().size() > MAX_SAVE_BYTES:
+		push_warning("WOW save: snapshot exceeds schema v1 safety limit")
+		return false
 	var temporary: String = path + ".tmp"
 	var file: FileAccess = FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		push_warning("WOW save: cannot open temporary file: " + temporary)
 		return false
-	file.store_string(JSON.stringify(data, "\t"))
+	file.store_string(json_text)
 	file.flush()
 	file.close()
 	# Jedna operacja rename; w razie błędu poprzedni zapis pozostaje bez zmian.
