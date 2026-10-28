@@ -59,9 +59,9 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 **Potwierdzenie automatyczne:** `tests/save_load_smoke.gd` i cały zestaw testów Godota przeszły na Linuxie i Windows: [GitHub Actions](https://github.com/serafin1367/wow/actions/runs/40680932293). Zapisane są także nieprzetworzone paczki przy pełnym buforze, a zapis wyczerpanego złoża nie uszkadza kopalni. **Do ręcznej weryfikacji:** wygląd przycisków ZAPISZ/WCZYTAJ i wygoda korzystania z nich w oknie gry na Windows.
 
-### WOW 0.14 — magazyny pośrednie i logistyka (P0) — **w trakcie**
+### WOW 0.14 — magazyny pośrednie i logistyka (P0) — **ukończony technicznie, do odbioru wizualnego**
 
-**Zrealizowano:** budowanie magazynów pośrednich `U` (do 3), wspólne porty `Inventory` dla kopalni, huty, robotów i taśm, `LogisticsManager` z priorytetowymi zleceniami i rezerwacjami, szkolenie dodatkowych transportowców `Shift+T` i zapis aktywnych zleceń. Zadania mogą prowadzić przez wiele magazynów, bez podwójnego rezerwowania zasobów. Przeszły testy `tests/inventory_smoke.gd`, `tests/logistics_depot_smoke.gd`, `tests/logistics_jobs_smoke.gd`, `tests/logistics_multidepot_smoke.gd` i `tests/save_load_smoke.gd`; [CI Linux + Windows](https://github.com/serafin1367/wow/actions/runs/40685120883). **Pozostało:** panel gracza do ustawiania priorytetów i min./maks. zapasu, obsługa zmiany celu w trakcie jazdy, reagowanie na całkowicie niedostępne trasy i długie testy całej floty.
+**Zrealizowano:** magazyny pośrednie, wspólny model `Inventory`, transportowce `Shift+T`, kolejkę priorytetowych dostaw, limity MIN/MAX, panel logistyczny `O`, rezerwacje i anulowanie zleceń, zmianę celu **po odebraniu ładunku**, odzyskiwanie niedostępnych tras z czasowym wycofaniem rezerwacji oraz zapis/odczyt całej gospodarki. Testy potwierdzają współbieżność transportów i brak duplikacji materiałów. **Do ręcznej weryfikacji:** wygląd i ergonomia panelu na Windows przy mniejszych rozdzielczościach. Automatyczna optymalizacja wyboru najbliższego magazynu pozostaje przyszłym usprawnieniem.
 
 - [x] Nowy budynek: **depot logistyczny** z ograniczoną pojemnością i kilkoma typami surowca.
 - [x] Model ekwipunku dla magazynów i maszyn: wolne miejsce, rezerwacje, pobranie, dostarczenie.
@@ -70,11 +70,11 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 - [x] Nadać magazynom, buforom, portom i zleceniom stabilne `save_id` oraz kontrakt `to_dict()` / `from_dict()` wdrożony w WOW 0.13.
 - [x] Uogólnić zlecenia transportowe: **skąd → co → ile → dokąd**, zamiast sztywnej trasy kopalnia–huta.
 - [x] Automatyczny przydział wolnego transportowca do najważniejszego zlecenia.
-- [ ] Ustawianie priorytetów zleceń i limitów zapasu (min./maks.) dla magazynów.
-- [ ] Obsłużyć brak drogi, pełny magazyn, rozładowany robot, zmianę celu i anulowanie zlecenia.
-- [ ] Test wielu magazynów, robotów i taśmociągów korzystających z **tych samych portów**: **każda jednostka ładunku ma dokładnie jednego właściciela**. Zweryfikować również zapis/odczyt z aktywnymi rezerwacjami.
+- [x] Ustawianie priorytetów zleceń i limitów zapasu (min./maks.) dla magazynów.
+- [x] Obsłużyć brak drogi, pełny magazyn, rozładowany robot, zmianę celu i anulowanie zlecenia.
+- [x] Test wielu magazynów, robotów i taśmociągów korzystających z **tych samych portów**: **każda jednostka ładunku ma dokładnie jednego właściciela**. Zweryfikować również zapis/odczyt z aktywnymi rezerwacjami.
 
-**Stan na 28.10.2026:** automatyczna kolejka przez wiele magazynów jest gotowa, dwa równoległe przydziały oraz współdzielone rezerwacje z kilku magazynów zostały przetestowane. Priorytety i limity `min/max` istnieją jako API (`set_priority`, `set_stock_limits`) i są utrwalane w zapisie, ale nie mają jeszcze panelu konfiguracyjnego. Zadania w trakcie transportu nie są anulowane, by nie zgubić ładunku.
+**Potwierdzenie GitHub Actions:** pełna regresja Linux i test zapisu/odczytu Windows, w tym `tests/logistics_panel_smoke.gd` (panel i priorytety), `tests/logistics_recovery_smoke.gd` (brak drogi), `tests/logistics_redirect_smoke.gd` (bezpieczne przekierowanie paczki), `tests/logistics_fleet_smoke.gd` (20 robotów, 300 kroków fizyki i zapis/odczyt). [Wyniki testów](https://github.com/serafin1367/wow/actions/runs/40689835635).
 
 **Kryterium ukończenia:** co najmniej dwa równoległe transporty między trzema budynkami nie tracą ani nie powielają surowców; przełączenie odbioru z robota na taśmę **nie wymaga zmiany logiki magazynu**. Proponowane moduły: `Inventory`, `BufferPort`, `LogisticsManager`, `TransportJob`.
 
@@ -187,7 +187,7 @@ Wersję 1.0 uznajemy za gotową, jeżeli spełnia **wszystkie** warunki:
 
 ## 6. Pierwszy pakiet prac do rozpoczęcia teraz
 
-**WOW 0.13 wykonany i potwierdzony w CI.** Pakiet S1–S7 zrealizowany; kolejne zadanie to integracja `Inventory` / `BufferPort` z kopalnią, hutą, robotami i taśmociągami w WOW 0.14:
+**WOW 0.13 i WOW 0.14 wykonane technicznie.** Poniższy historyczny pakiet S1–S7 został zrealizowany; następny etap to **WOW 0.15 — panel produkcji**, informacje o wejściu/wyjściu maszyn, wskaźnik postępu i powody przestojów:
 
 - [x] **S1.** Spisać stan gry wymagający serializacji; zdefiniować `schema_version = 1`, stabilne `save_id` i **obowiązkowy kontrakt `to_dict()` / `from_dict()` dla każdego nowego trwałego obiektu (również w 0.14+)**.
 - [x] **S2.** Dodać `SaveGameManager` + zapis/odczyt danych podstawowych (planeta, surowce, budynki, obrót) z kontraktem serializacji; **nie utrwalać referencji do `Node`**.
@@ -199,6 +199,6 @@ Wersję 1.0 uznajemy za gotową, jeżeli spełnia **wszystkie** warunki:
 
 ---
 
-**Ostatnie wykonanie:** 28.10.2026 — WOW 0.13 (zapis/odczyt) oraz początek WOW 0.14 (`Inventory`). Testy Linux + Windows: https://github.com/serafin1367/wow/actions/runs/40680932293.
+**Ostatnie wykonanie:** 28.10.2026 — WOW 0.14: panel i zlecenia logistyczne, przekierowanie aktywnego ładunku, test 20 robotów; CI Linux + Windows: https://github.com/serafin1367/wow/actions/runs/40689835635.
 
 **Zarządzanie planem:** po zakończeniu każdego etapu oznaczać zadania `[x]`, dopisywać link do commita lub testu i aktualizować priorytety. Nie oznaczać funkcji jako gotowej wyłącznie na podstawie utworzonego pliku — wymagane jest działanie w grze i test.
