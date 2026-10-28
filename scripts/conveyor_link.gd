@@ -281,3 +281,59 @@ func describe() -> String:
 	return "%s | Paczki: %d | Dostarczono: %d | Pobor: %.2f kW" % [
 		status, packets.size(), total_transferred, POWER_KW
 	]
+
+
+func to_dict() -> Dictionary:
+	var route: Array = []
+	for point in path_points:
+		route.append([point.x, point.y, point.z])
+	var cargo: Array = []
+	for packet in packets:
+		cargo.append({"distance": float(packet["distance"]),
+			"amount": int(packet["amount"]), "resource_type": "iron_ore" if mode == "ore" else "metal"})
+	return {"save_id": str(get_meta("save_id", "belt:" + mode)), "mode": mode,
+		"path_points": route, "packets": cargo, "elapsed": elapsed,
+		"total_transferred": total_transferred}
+
+
+func setup_saved_route(data: Dictionary, new_source, new_destination) -> void:
+	mode = str(data.get("mode", "ore"))
+	source = new_source
+	destination = new_destination
+	path_points.clear()
+	path_distances.clear()
+	route_length = 0.0
+	for raw in data.get("path_points", []):
+		if raw is Array and raw.size() == 3:
+			var point := Vector3(float(raw[0]), float(raw[1]), float(raw[2]))
+			if not path_points.is_empty():
+				route_length += path_points[path_points.size() - 1].distance_to(point)
+			path_points.append(point)
+			path_distances.append(route_length)
+
+
+func from_dict(data: Dictionary) -> void:
+	set_meta("save_id", str(data.get("save_id", "belt:" + mode)))
+	elapsed = clampf(float(data.get("elapsed", 0.0)), 0.0, SPAWN_INTERVAL)
+	total_transferred = maxi(0, int(data.get("total_transferred", 0)))
+	for old in packets:
+		if is_instance_valid(old.get("visual")):
+			old["visual"].queue_free()
+	packets.clear()
+	# Pozycje 3D wyliczamy z trasy, a nie z historycznego transformu mesha.
+	for item in data.get("packets", []):
+		if not (item is Dictionary) or path_points.size() < 2:
+			continue
+		var amount: int = int(item.get("amount", 0))
+		if amount <= 0:
+			continue
+		var distance: float = clampf(float(item.get("distance", 0.0)), 0.0, route_length)
+		var visual := MeshInstance3D.new()
+		visual.name = "OrePacket" if mode == "ore" else "MetalPacket"
+		var parcel := BoxMesh.new()
+		parcel.size = Vector3(0.62, 0.35, 0.58)
+		visual.mesh = parcel
+		visual.material_override = ore_material if mode == "ore" else metal_material
+		add_child(visual)
+		visual.position = _at_distance(distance) + Vector3(0.0, 0.74, 0.0)
+		packets.append({"distance": distance, "amount": amount, "visual": visual})
