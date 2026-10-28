@@ -136,6 +136,15 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|DEPOT TEST:' /tmp/wow-depot.log; then
             exit 1
           fi
+      - name: Test priority logistics jobs and resumed reserved deliveries
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/logistics_jobs_smoke.gd 2>&1 | tee /tmp/wow-jobs.log
+          grep -F 'LOGISTICS JOB SMOKE OK' /tmp/wow-jobs.log
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|JOB TEST:' /tmp/wow-jobs.log; then
+            exit 1
+          fi
       - name: Test planet cycling preserves gameplay state
         shell: bash
         run: |
