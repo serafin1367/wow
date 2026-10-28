@@ -15,6 +15,7 @@ func _fail(message: String) -> void:
 
 
 func _run() -> void:
+	print("JOB STEP 1: create scene")
 	var game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -34,6 +35,7 @@ func _run() -> void:
 	var robot = game.workers[1]
 	robot.set_physics_process(false)
 	robot.command_move([])
+	print("JOB STEP 2: schedule and route")
 	game._tick_logistics(0.9)
 	var job: Dictionary = {}
 	for candidate in game.logistics_manager.jobs:
@@ -53,6 +55,7 @@ func _run() -> void:
 		_fail("Ta sama ruda pozostala dostepna dla tasmy")
 		return
 	# Symulujemy dotarcie robota do miejsca zaladunku.
+	print("JOB STEP 3: pickup")
 	robot._finish_route()
 	if robot.carried_amount != 20 or robot.carried_type != "iron_ore":
 		_fail("Odebranie rudy przez robota zmienilo ilosc ladunku")
@@ -65,6 +68,7 @@ func _run() -> void:
 		return
 
 	var mass_before: int = _balance(game)
+	print("JOB STEP 4: save moving cargo")
 	var manager = SAVE.new()
 	if not manager.save_file(game, TEST_PATH):
 		_fail("Nie mozna zapisac aktywnego zlecenia")
@@ -73,6 +77,7 @@ func _run() -> void:
 	if snapshot.is_empty():
 		_fail("Nie mozna odczytac zapisanych zlecen")
 		return
+	print("JOB STEP 5: restore moving cargo")
 	var fresh = load("res://scenes/main.tscn").instantiate()
 	root.add_child(fresh)
 	if not manager.from_dict(fresh, snapshot):
@@ -95,6 +100,7 @@ func _run() -> void:
 		return
 	# Symulujemy dojazd do magazynu po przywroceniu sciezki A*.
 	fresh_worker.state = fresh_worker.WorkState.TO_LOGISTICS_DELIVERY
+	print("JOB STEP 6: complete delivery")
 	fresh_worker._finish_route()
 	if fresh_worker.carried_amount != 0 or final_depot.cargo.quantity("iron_ore") != 20:
 		_fail("Po odczycie robot nie dostarczyl zarezerwowanego ladunku")
@@ -106,6 +112,7 @@ func _run() -> void:
 		_fail("Dostawa powielila lub zgubila zasoby")
 		return
 	# W kolejnej turze utworz przeplyw depot -> huta.
+	print("JOB STEP 7: queue next leg")
 	fresh._tick_logistics(0.9)
 	var second: Dictionary = {}
 	for candidate in fresh.logistics_manager.jobs:
