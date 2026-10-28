@@ -41,8 +41,12 @@ func submit(from_node, to_node, resource_type: String, amount: int, priority: in
 	if source_port == null or (destination_port == null and not sink):
 		return ""
 	var count: int = mini(amount, source_port.available_output(resource_type))
+	if from_node.has_method("available_export"):
+		count = mini(count, from_node.available_export(resource_type))
 	if not sink:
 		count = mini(count, destination_port.available_input(resource_type))
+		if to_node.has_method("available_import"):
+			count = mini(count, to_node.available_import(resource_type))
 	if count <= 0:
 		return ""
 	var id: String = "logistics:%d" % next_number
@@ -93,6 +97,35 @@ func note_pickup(job_id: String, amount: int) -> void:
 	var job: Dictionary = get_job(job_id)
 	if not job.is_empty() and job["status"] == "assigned" and amount == int(job["amount"]):
 		job["status"] = "picked"
+
+
+func set_priority(job_id: String, priority: int) -> bool:
+	var job: Dictionary = get_job(job_id)
+	if job.is_empty():
+		return false
+	job["priority"] = clampi(priority, 0, 200)
+	return true
+
+
+func cancel(job_id: String, workers: Array) -> bool:
+	var job: Dictionary = get_job(job_id)
+	if job.is_empty() or job["status"] == "picked":
+		# Po pobraniu transportowiec posiada ladunek, nie mozemy go skasowac.
+		return false
+	if job["status"] == "assigned":
+		for worker in workers:
+			if worker.logistics_job_id == job_id:
+				if worker.carried_amount > 0:
+					return false
+				worker.logistics_job_id = ""
+				worker.logistics_source = null
+				worker.logistics_destination = null
+				worker.logistics_manager = null
+				worker.waypoints.clear()
+				worker.state = worker.WorkState.IDLE
+				break
+	finish(job_id)
+	return true
 
 
 func finish(job_id: String) -> void:
