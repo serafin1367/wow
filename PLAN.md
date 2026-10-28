@@ -102,7 +102,9 @@ P0 — blokujące dalszy rozwój; P1 — podstawowe systemy gry; P2 — rozbudow
 
 **Etap 1: RecipeRegistry (realizacja).** Utworzono `scripts/production_recipe.gd` i `scripts/recipe_registry.gd`. Rejestr definiuje w jednym miejscu zużywane surowce, produkty, czas cyklu i moc. Huta `automated_smelter.gd` wykonuje cykle przez `ProductionRecipe.process_once` z uwzględnieniem rezerwacji w `Inventory`, a `recipe_id` zapisuje razem ze stanem budynku (starsze zapisy domyślnie używają `smelt_iron`). `tests/recipe_registry_smoke.gd` kontroluje bilans, błędne dane, rezerwacje, schemat JSON i kompatybilność; włączony do GitHub Actions.
 
-**Zakres następnej partii:** nowe surowce i produkty, warsztat oraz pełny drugi łańcuch.
+**Postęp etapu 2 (28.10.2026):** dodano definicje `forge_steel` (2 metal → 1 steel) oraz `assemble_electronics` (1 metal + 1 steel → 1 electronics) w `RecipeRegistry` i test bilansu, rezerwacji, pełnego wyjścia oraz JSON. Są to na razie receptury dla przyszłego warsztatu (`machine_kind = workshop`), jeszcze niepodłączone do budynków, HUD ani logistyki. Zadania etapu pozostają otwarte do czasu działającej produkcji w rozgrywce i zielonego CI.
+
+**Zakres następnej partii:** warsztat z buforami i cyklem produkcji, przepływ stali/elektroniki do logistyki oraz pełny drugi łańcuch.
 
 - [x] Zastąpić recepturę huty wpisaną na stałe **rejestrem receptur** (wejście, wyjście, czas, moc); podstawowa definicja kopalni jest już w rejestrze, ale jej logika wydobycia nadal korzysta z naturalnego złoża.
 - [ ] Dodać przynajmniej dwa kolejne surowce/produkty (np. stal i element elektroniczny).
